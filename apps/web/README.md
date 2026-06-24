@@ -7,7 +7,7 @@ Next.js frontend for the digital content app.
 Copy `.env.example` to `.env.local` and fill in the deployed API URL and Firebase web app config.
 
 ```sh
-npm run dev -w apps/web
+pnpm --filter web dev
 ```
 
 The app runs on `http://localhost:3000`.
