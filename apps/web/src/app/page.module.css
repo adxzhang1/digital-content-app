@@ -1,0 +1,44 @@
+.page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  padding: 0 20px;
+}
+
+.hero {
+  align-content: center;
+  display: grid;
+  gap: 20px;
+  min-height: calc(100dvh - 58px);
+  padding: 56px;
+  width: min(760px, 100%);
+}
+
+.eyebrow {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  font-size: clamp(3rem, 9vw, 6.8rem);
+  line-height: 0.93;
+}
+
+.copy {
+  color: var(--text-muted);
+  font-size: 1.12rem;
+  line-height: 1.6;
+  max-width: 620px;
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding: 0;
+  }
+
+  .hero {
+    padding: 28px;
+  }
+}

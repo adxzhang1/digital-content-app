@@ -1,0 +1,335 @@
+.modalBackdrop {
+  background: #000000;
+  inset: 0;
+  position: fixed;
+  z-index: 20;
+}
+
+.modal {
+  background: #000000;
+  height: 100dvh;
+  overflow: hidden;
+  width: 100%;
+}
+
+.feedViewer {
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: pinch-zoom;
+}
+
+.feedTrack {
+  position: relative;
+  transition: transform 200ms ease;
+  will-change: transform;
+  width: 100%;
+}
+
+.feedItem {
+  height: 100dvh;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.modalVisual {
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+.carouselViewport {
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  touch-action: pinch-zoom;
+  width: 100%;
+}
+
+.carouselTrack {
+  height: 100dvh;
+  position: relative;
+  transition: transform 200ms ease;
+  will-change: transform;
+}
+
+.carouselSlide {
+  backface-visibility: hidden;
+  height: 100dvh;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  transform: translateZ(0);
+  width: 100%;
+}
+
+.modalImage {
+  backface-visibility: hidden;
+  display: block;
+  height: 100dvh;
+  object-fit: contain;
+  transform: translateZ(0);
+  user-select: none;
+  -webkit-user-drag: none;
+  width: 100%;
+}
+
+.modalImageCover {
+  object-fit: cover;
+}
+
+.carouselButton {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  height: 42px;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  z-index: 2;
+}
+
+.carouselButton svg {
+  fill: none;
+  height: 24px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 24px;
+}
+
+.carouselButton:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.carouselPrevious {
+  left: 24px;
+}
+
+.carouselNext {
+  right: 24px;
+}
+
+.carouselDots {
+  bottom: 18px;
+  display: flex;
+  gap: 6px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.carouselDots span {
+  background: rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  height: 6px;
+  width: 6px;
+}
+
+.carouselDots .carouselDotActive {
+  background: #ffffff;
+}
+
+.modalLike,
+.modalLikeActive,
+.modalFit {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  width: 42px;
+}
+
+.modalLikeActive {
+  color: var(--accent);
+  cursor: default;
+}
+
+.likeIcon {
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
+  height: 38px;
+  width: 38px;
+}
+
+.fitIcon {
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
+  height: 32px;
+  width: 32px;
+}
+
+.modalClose,
+.modalLoading button {
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 1.6rem;
+  height: 44px;
+  position: absolute;
+  right: 24px;
+  top: 22px;
+  width: 44px;
+  z-index: 2;
+}
+
+.postMenu {
+  position: absolute;
+  right: 82px;
+  top: 22px;
+  z-index: 3;
+}
+
+.postMenuButton {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.postMenuButton svg {
+  fill: currentColor;
+  height: 24px;
+  width: 24px;
+}
+
+.postMenuPanel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+  min-width: 148px;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: 52px;
+}
+
+.postMenuPanel button {
+  background: transparent;
+  border: 0;
+  color: #d92d20;
+  cursor: pointer;
+  font: inherit;
+  padding: 12px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.postMenuPanel button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.modalContent {
+  bottom: 28px;
+  color: #ffffff;
+  display: grid;
+  gap: 10px;
+  left: 28px;
+  max-width: min(560px, calc(100% - 128px));
+  position: absolute;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.42);
+  z-index: 1;
+}
+
+.modalCaption {
+  font-size: 1rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.modalDate {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.modalError {
+  color: #ffb4a8;
+  font-weight: 700;
+}
+
+.modalActions {
+  align-items: center;
+  color: #ffffff;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  position: absolute;
+  right: 28px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+  top: 68%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.modalActions strong {
+  font-size: 0.9rem;
+}
+
+.modalLoading {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+}
+
+@media (max-width: 720px) {
+  .modalContent {
+    bottom: 22px;
+    left: 16px;
+    max-width: calc(100% - 96px);
+  }
+
+  .modalActions {
+    right: 16px;
+    top: 70%;
+  }
+
+  .modalLike,
+  .modalLikeActive,
+  .modalFit {
+    height: 38px;
+    width: 38px;
+  }
+
+  .carouselButton {
+    height: 38px;
+    width: 38px;
+  }
+
+  .carouselPrevious {
+    left: 12px;
+  }
+
+  .carouselNext {
+    right: 12px;
+  }
+}

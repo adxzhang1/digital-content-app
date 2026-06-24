@@ -1,0 +1,430 @@
+.page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  padding: 0 20px 56px;
+}
+
+.dashboard {
+  display: grid;
+  gap: 34px;
+  margin: 0 auto;
+  max-width: 935px;
+}
+
+.creatorLoading {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: center;
+  min-height: 220px;
+}
+
+.creatorLoading span {
+  animation: spin 0.8s linear infinite;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  height: 24px;
+  width: 24px;
+}
+
+.profileHeader {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  column-gap: 44px;
+  display: grid;
+  grid-template-areas:
+    "avatar main actions"
+    "avatar bio actions";
+  grid-template-columns: 170px 1fr auto;
+  padding: 34px 0 42px;
+  row-gap: 6px;
+}
+
+.avatarColumn {
+  display: flex;
+  grid-area: avatar;
+  justify-content: center;
+}
+
+.avatar {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  height: 154px;
+  width: 154px;
+}
+
+.profileMain {
+  display: grid;
+  gap: 12px;
+  grid-area: main;
+  min-width: 0;
+}
+
+.profileMain h1 {
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.counts {
+  display: flex;
+  gap: 38px;
+}
+
+.counts div {
+  display: flex;
+  gap: 5px;
+}
+
+.counts dd {
+  font-weight: 800;
+}
+
+.counts dt {
+  color: var(--text-muted);
+}
+
+.profileBio {
+  display: grid;
+  gap: 4px;
+  grid-area: bio;
+  margin-top: 8px;
+  max-width: 560px;
+}
+
+.profileBio p {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.profileActions {
+  align-self: start;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  grid-area: actions;
+  margin-left: auto;
+}
+
+.createButton,
+.menuButton {
+  align-items: center;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0;
+  width: 42px;
+}
+
+.createButton {
+  background: var(--accent);
+  border-radius: 50%;
+  color: var(--accent-foreground);
+}
+
+.menuButton {
+  background: var(--button-muted);
+  border-radius: 8px;
+  color: var(--foreground);
+}
+
+.menuButton svg {
+  fill: currentColor;
+  height: 24px;
+  width: 24px;
+}
+
+.createButton svg {
+  fill: none;
+  height: 22px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+  width: 22px;
+}
+
+.postsSection {
+  display: grid;
+  gap: 14px;
+}
+
+.postsHeader {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.postsHeader h2 {
+  font-size: 1.1rem;
+}
+
+.modalBackdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 30;
+}
+
+.createPostModal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  max-height: calc(100dvh - 36px);
+  max-width: 620px;
+  overflow: auto;
+  padding: 22px;
+  width: 100%;
+}
+
+.modalHeader {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.modalHeader h2 {
+  font-size: 1.15rem;
+}
+
+.fullScreenModal {
+  background: var(--background);
+  color: var(--foreground);
+  display: grid;
+  gap: 18px;
+  grid-template-rows: auto 1fr;
+  inset: 0;
+  padding: 22px;
+  position: fixed;
+  z-index: 40;
+}
+
+.fullScreenModalHeader {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.fullScreenModalHeader h2 {
+  font-size: 1.25rem;
+}
+
+.logoutAction {
+  align-self: start;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--danger);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 52px;
+  text-align: left;
+}
+
+.modalClose {
+  align-items: center;
+  background: var(--button-muted);
+  border: 0;
+  border-radius: 50%;
+  color: var(--foreground);
+  cursor: pointer;
+  display: flex;
+  font-size: 1.35rem;
+  height: 36px;
+  justify-content: center;
+  line-height: 1;
+  width: 36px;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.form label {
+  display: grid;
+  gap: 8px;
+}
+
+.form input,
+.form textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  outline: 0;
+  padding: 12px;
+}
+
+.form input:focus,
+.form textarea:focus {
+  border-color: var(--accent);
+}
+
+.form textarea {
+  resize: vertical;
+}
+
+.selectedFiles {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, 1fr);
+  touch-action: none;
+}
+
+.selectedFile {
+  aspect-ratio: 4 / 5;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  touch-action: none;
+  user-select: none;
+}
+
+.selectedFile:active {
+  cursor: grabbing;
+}
+
+.selectedFile img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  width: 100%;
+}
+
+.draggingFile {
+  opacity: 0.45;
+}
+
+.progress {
+  background: var(--surface-muted);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progress span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+  transition: width 160ms ease;
+}
+
+.formFooter {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.formFooter p {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.formFooter button {
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  color: var(--accent-foreground);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 0 18px;
+}
+
+.formFooter button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.success {
+  color: var(--success);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.idle {
+  color: var(--text-muted);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 0 0 40px;
+  }
+
+  .dashboard {
+    gap: 28px;
+  }
+
+  .profileHeader {
+    gap: 12px;
+    grid-template-areas:
+      "avatar main actions"
+      "bio bio bio";
+    grid-template-columns: auto 1fr auto;
+    padding: 12px 16px 24px;
+  }
+
+  .postsHeader {
+    padding: 0 16px;
+  }
+
+  .avatarColumn {
+    align-self: start;
+  }
+
+  .avatar {
+    height: 82px;
+    width: 82px;
+  }
+
+  .profileMain h1 {
+    font-size: 1.2rem;
+  }
+
+  .counts {
+    gap: 14px;
+  }
+
+  .counts div {
+    gap: 2px;
+  }
+
+  .formFooter {
+    display: grid;
+  }
+
+  .selectedFiles {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

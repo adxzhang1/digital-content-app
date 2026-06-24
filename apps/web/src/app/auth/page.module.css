@@ -1,0 +1,141 @@
+.page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  padding: 0 20px 56px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  margin: 28px auto 0;
+  max-width: 560px;
+  padding: 22px;
+}
+
+.footer {
+  display: grid;
+  gap: 10px;
+}
+
+.actions button {
+  align-items: center;
+  border-radius: 8px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  cursor: pointer;
+  display: flex;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  width: 100%;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.buttonSpinner {
+  animation: spin 0.8s linear infinite;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  height: 18px;
+  width: 18px;
+}
+
+.actions .secondaryAction {
+  background: transparent;
+  color: var(--text-muted);
+  min-height: auto;
+  padding: 4px 0;
+}
+
+.actions .secondaryAction:hover {
+  color: var(--foreground);
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.flowLoading {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.flowContent {
+  display: grid;
+  gap: 18px;
+}
+
+.title {
+  font-size: 1.4rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.footer p,
+.disclaimer {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.disclaimer {
+  font-size: 0.85rem;
+  margin: 0;
+  padding-bottom: 8px;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.form input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  outline: 0;
+  padding: 12px;
+}
+
+.form input:focus {
+  border-color: var(--accent);
+}
+
+.success {
+  color: var(--success);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.idle {
+  color: var(--text-muted);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 0 0 40px;
+  }
+}

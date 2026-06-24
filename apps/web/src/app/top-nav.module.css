@@ -1,0 +1,30 @@
+.topNav {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  min-height: 58px;
+  width: 100%;
+}
+
+.iconLink {
+  align-items: center;
+  display: flex;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.profileLink {
+  margin-left: auto;
+}
+
+.iconLink svg {
+  fill: none;
+  height: 22px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 22px;
+}

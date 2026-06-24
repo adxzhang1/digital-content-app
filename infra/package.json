@@ -1,0 +1,26 @@
+{
+  "name": "@digital-content/infra",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "digital-content-infra": "bin/app.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "cdk": "cdk",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy",
+    "synth": "cdk synth",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.174.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.174.0",
+    "esbuild": "^0.24.2",
+    "tsx": "^4.19.2"
+  }
+}

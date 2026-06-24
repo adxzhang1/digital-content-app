@@ -1,0 +1,263 @@
+.page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  padding: 0 20px 56px;
+}
+
+.content {
+  padding-bottom: 56px;
+}
+
+.profile,
+.feed {
+  margin: 0 auto;
+  max-width: 935px;
+}
+
+.profile {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  column-gap: 44px;
+  grid-template-areas:
+    "avatar main"
+    "avatar bio";
+  grid-template-columns: 170px 1fr;
+  row-gap: 6px;
+  padding: 34px 0 42px;
+}
+
+.avatarColumn {
+  display: flex;
+  grid-area: avatar;
+  justify-content: center;
+}
+
+.avatar {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  height: 154px;
+  width: 154px;
+}
+
+.profileMain {
+  display: grid;
+  gap: 12px;
+  grid-area: main;
+  min-width: 0;
+}
+
+.profileMain h1 {
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.counts {
+  display: flex;
+  gap: 38px;
+}
+
+.counts div {
+  display: flex;
+  gap: 5px;
+}
+
+.counts dd {
+  font-weight: 800;
+}
+
+.counts dt {
+  color: var(--text-muted);
+}
+
+.bio {
+  display: grid;
+  gap: 4px;
+  grid-area: bio;
+  margin-top: 8px;
+  max-width: 560px;
+}
+
+.bio p {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.feedTabs {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 52px;
+  text-transform: uppercase;
+}
+
+.feedTabs span {
+  border-bottom: 1px solid var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding-bottom: 12px;
+  padding-top: 13px;
+}
+
+.grid {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.loadingPosts {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.loadingPosts svg {
+  animation: spin 0.8s linear infinite;
+  fill: none;
+  height: 28px;
+  stroke: currentColor;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 12;
+  stroke-linecap: round;
+  stroke-width: 2;
+  width: 28px;
+}
+
+.locked {
+  align-items: center;
+  display: grid;
+  justify-items: center;
+  margin: 28px auto 0;
+  max-width: 420px;
+  padding: 24px;
+}
+
+.authLink {
+  align-items: center;
+  background: var(--foreground);
+  border: 0;
+  border-radius: 8px;
+  color: var(--background);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 22px;
+}
+
+.authModalBackdrop {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 30;
+}
+
+.authModal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  max-height: calc(100dvh - 36px);
+  max-width: 420px;
+  overflow: auto;
+  padding: 22px;
+  width: 100%;
+}
+
+.authModalClose {
+  align-items: center;
+  background: var(--button-muted);
+  border: 0;
+  border-radius: 50%;
+  color: var(--foreground);
+  cursor: pointer;
+  display: flex;
+  font-size: 1.35rem;
+  height: 36px;
+  justify-content: center;
+  justify-self: end;
+  line-height: 1;
+  width: 36px;
+}
+
+.post {
+  aspect-ratio: 4 / 5;
+  background: var(--surface-muted);
+  border: 0;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.postImage {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 0 0 40px;
+  }
+
+  .content {
+    padding-bottom: 40px;
+  }
+
+  .profile {
+    gap: 12px;
+    grid-template-areas:
+      "avatar main"
+      "bio bio";
+    grid-template-columns: auto 1fr;
+    padding: 12px 16px 24px;
+  }
+
+  .avatarColumn {
+    align-self: start;
+  }
+
+  .avatar {
+    height: 82px;
+    width: 82px;
+  }
+
+  .profileMain {
+    gap: 12px;
+  }
+
+  .profileMain h1 {
+    font-size: 1.2rem;
+  }
+
+  .counts {
+    gap: 14px;
+  }
+
+  .counts div {
+    gap: 2px;
+  }
+
+  .grid {
+    gap: 3px;
+  }
+}

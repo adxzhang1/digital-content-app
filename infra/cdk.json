@@ -1,0 +1,21 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "context": {
+    "firebaseProjectId": "digital-content-app-dev",
+    "firebaseServiceAccountSecretName": "digital-content/firebase-service-account/dev",
+    "mediaSigningKeySecretName": "digital-content/media-signing-key/dev"
+  },
+  "watch": {
+    "include": ["**"],
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "**/*.js",
+      "tsconfig.json",
+      "package*.json",
+      "node_modules",
+      "test"
+    ]
+  }
+}
