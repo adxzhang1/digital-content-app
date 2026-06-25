@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { VirtualCarousel } from "@/features/feed/virtual-carousel";
+import { ScrollSnapCarousel } from "@/features/feed/scroll-snap-carousel";
 import styles from "./post-feed-viewer.module.css";
 import type { ProfilePostDetail, ProfilePostSummary } from "./profile-data";
 
@@ -121,5 +121,10 @@ export function PostMedia({
     );
   }
 
-  return <VirtualCarousel items={mediaItems} renderItem={renderCarouselItem} />;
+  return (
+    <ScrollSnapCarousel
+      items={mediaItems}
+      renderItem={renderCarouselItem}
+    />
+  );
 }

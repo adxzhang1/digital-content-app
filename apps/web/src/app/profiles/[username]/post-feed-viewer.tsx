@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { VirtualFeed } from "@/features/feed/virtual-feed";
+import { ScrollSnapFeed } from "@/features/feed/scroll-snap-feed";
 import { getCurrentIdToken } from "@/lib/auth-client";
 import { publicConfig } from "@/lib/config";
 import { isAuthSessionReady, useAuth } from "../../auth-provider";
@@ -260,7 +260,7 @@ export function PostFeedViewer({
     >
       <article className={styles.modal}>
         <div className={styles.feedShell}>
-          <VirtualFeed
+          <ScrollSnapFeed
             activeItemId={activePostId}
             ariaLabel="Post feed"
             items={feedPosts}
