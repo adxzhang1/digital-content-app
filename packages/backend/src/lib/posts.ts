@@ -67,6 +67,7 @@ export const toPostResponse = async (
   caption: String(post.caption ?? ""),
   status: String(post.status ?? "READY"),
   media: await toMediaResponse(post.media, signingConfig),
+  mediaCount: Array.isArray(post.media) ? post.media.length : 0,
   createdAt: String(post.createdAt),
   updatedAt: String(post.updatedAt ?? post.createdAt),
   likeCount: Number(post.likeCount ?? 0)

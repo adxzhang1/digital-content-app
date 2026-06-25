@@ -11,21 +11,13 @@ import { getCurrentIdToken } from "@/lib/auth-client";
 import { publicConfig } from "@/lib/config";
 import styles from "./page.module.css";
 import { PostFeedViewer } from "./post-feed-viewer";
-import type { ProfilePostDetail, ProfilePostSummary } from "./profile-data";
+import type { ProfilePostSummary } from "./profile-data";
 
 type ProfilePostGridProps = {
   username: string;
 };
 
 const apiBaseUrl = publicConfig.apiBaseUrl;
-
-const getPostImageUrl = (post: ProfilePostDetail | ProfilePostSummary) => {
-  if ("media" in post) {
-    return post.media.find((item) => item.url)?.url;
-  }
-
-  return post.thumbnail?.url;
-};
 
 function PostPreview({
   post,
@@ -34,7 +26,7 @@ function PostPreview({
   post: ProfilePostSummary;
   onOpen: () => void;
 }) {
-  const imageUrl = getPostImageUrl(post);
+  const imageUrl = post.thumbnail?.url;
 
   return (
     <button
@@ -60,16 +52,7 @@ export function ProfilePostGrid({
   const [postsError, setPostsError] = useState("");
   const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [viewerPostId, setViewerPostId] = useState<string | null>(null);
-  const [postDetails, setPostDetails] = useState<
-    Record<string, ProfilePostDetail>
-  >({});
-  const [isLoadingPost, setIsLoadingPost] = useState(false);
-  const [postError, setPostError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
-  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
-  const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
-  const [isDeletingPost, setIsDeletingPost] = useState(false);
 
   useEffect(() => {
     if (isAccountPending) {
@@ -107,11 +90,6 @@ export function ProfilePostGrid({
         }
 
         setPosts(data.posts);
-        setLikeCounts(
-          Object.fromEntries(
-            data.posts.map((post) => [post.postId, post.likeCount])
-          )
-        );
         setPostsError("");
       } catch (error) {
         if (!isActive) {
@@ -133,184 +111,23 @@ export function ProfilePostGrid({
     return () => {
       isActive = false;
     };
-  }, [
-    isAccountPending,
-    isAccountReady,
-    username,
-  ]);
+  }, [isAccountPending, isAccountReady, username]);
 
-  const loadPostDetail = useCallback(async (post: ProfilePostSummary) => {
-    setPostError(null);
-
-    if (!isAccountReady) {
-      return;
-    }
-
-    if (postDetails[post.postId]) {
-      return;
-    }
-
-    setIsLoadingPost(true);
-
-    try {
-      const idToken = await getCurrentIdToken();
-      const response = await fetch(
-        `${apiBaseUrl}/profiles/${username}/posts/${post.postId}`,
-        {
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        }
-      );
-      const data = (await response.json()) as {
-        post?: ProfilePostDetail;
-        message?: string;
-      };
-
-      const detailPost = data.post;
-
-      if (!response.ok || !detailPost) {
-        throw new Error(data.message ?? "Could not load post.");
-      }
-
-      setPostDetails((currentDetails) => ({
-        ...currentDetails,
-        [detailPost.postId]: detailPost,
-      }));
-      setIsPostMenuOpen(false);
-      setLikeCounts((currentCounts) => ({
-        ...currentCounts,
-        [detailPost.postId]: detailPost.likeCount,
-      }));
-    } catch (error) {
-      setPostError(
-        error instanceof Error ? error.message : "Could not load post."
-      );
-    } finally {
-      setIsLoadingPost(false);
-    }
-  }, [isAccountReady, postDetails, username]);
-
-  async function openPost(post: ProfilePostSummary) {
+  function openPost(post: ProfilePostSummary) {
     setViewerPostId(post.postId);
-    setPostError(null);
-    setIsPostMenuOpen(false);
-    await loadPostDetail(post);
   }
 
   function closeViewer() {
     setViewerPostId(null);
-    setIsPostMenuOpen(false);
-    setPostError(null);
-    setIsLoadingPost(false);
   }
 
-  async function likePost(postId: string) {
-    if (likedPostIds.has(postId)) {
-      return;
-    }
+  function removePost(postId: string) {
+    setPosts((currentPosts) =>
+      currentPosts.filter((currentPost) => currentPost.postId !== postId)
+    );
 
-    setLikedPostIds((currentIds) => new Set(currentIds).add(postId));
-    setLikeCounts((currentCounts) => ({
-      ...currentCounts,
-      [postId]: (currentCounts[postId] ?? 0) + 1,
-    }));
-
-    if (!isAccountReady) {
-      return;
-    }
-
-    try {
-      const idToken = await getCurrentIdToken();
-      const response = await fetch(
-        `${apiBaseUrl}/profiles/${username}/posts/${postId}/like`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        }
-      );
-      const data = (await response.json()) as { likes?: string };
-      const likes = data.likes;
-
-      if (!response.ok || !likes) {
-        throw new Error("Could not like post.");
-      }
-
-      setLikeCounts((currentCounts) => ({
-        ...currentCounts,
-        [postId]: Number(likes.replaceAll(",", "")),
-      }));
-    } catch {
-      setLikedPostIds((currentIds) => {
-        const nextIds = new Set(currentIds);
-        nextIds.delete(postId);
-        return nextIds;
-      });
-      setLikeCounts((currentCounts) => ({
-        ...currentCounts,
-        [postId]: Math.max((currentCounts[postId] ?? 1) - 1, 0),
-      }));
-    }
-  }
-
-  async function deletePost(
-    post: ProfilePostDetail,
-    deleteMode: "soft" | "force" = "soft"
-  ) {
-    if (!isAccountReady || auth.account?.profileId !== post.profileId) {
-      return;
-    }
-
-    setIsDeletingPost(true);
-    setPostError(null);
-
-    try {
-      const idToken = await getCurrentIdToken();
-      const forceDeleteQuery =
-        deleteMode === "force" ? "?deleteMode=force" : "";
-      const response = await fetch(
-        `${apiBaseUrl}/profiles/${username}/posts/${post.postId}${forceDeleteQuery}`,
-        {
-          method: "DELETE",
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        }
-      );
-      const data = (await response.json()) as { message?: string };
-
-      if (!response.ok) {
-        throw new Error(data.message ?? "Could not delete post.");
-      }
-
-      setPosts((currentPosts) =>
-        currentPosts.filter((currentPost) => currentPost.postId !== post.postId)
-      );
-      setLikeCounts((currentCounts) => {
-        const nextCounts = { ...currentCounts };
-        delete nextCounts[post.postId];
-        return nextCounts;
-      });
-      setLikedPostIds((currentIds) => {
-        const nextIds = new Set(currentIds);
-        nextIds.delete(post.postId);
-        return nextIds;
-      });
-      setPostDetails((currentDetails) => {
-        const nextDetails = { ...currentDetails };
-        delete nextDetails[post.postId];
-        return nextDetails;
-      });
+    if (viewerPostId === postId) {
       setViewerPostId(null);
-      setIsPostMenuOpen(false);
-    } catch (error) {
-      setPostError(
-        error instanceof Error ? error.message : "Could not delete post."
-      );
-    } finally {
-      setIsDeletingPost(false);
     }
   }
 
@@ -350,39 +167,20 @@ export function ProfilePostGrid({
           {posts.map((post) => (
             <PostPreview
               key={post.postId}
-              onOpen={() => void openPost(post)}
+              onOpen={() => openPost(post)}
               post={post}
             />
           ))}
         </div>
       ) : null}
 
-      {viewerPostId || isLoadingPost || postError ? (
+      {viewerPostId ? (
         <PostFeedViewer
-          activePostId={viewerPostId}
-          currentProfileId={
-            isAccountReady ? auth.account?.profileId : undefined
-          }
-          isDeletingPost={isDeletingPost}
-          isLoadingPost={isLoadingPost}
-          isPostMenuOpen={isPostMenuOpen}
-          likedPostIds={likedPostIds}
-          likeCounts={likeCounts}
-          onActivePostChange={(post) => {
-            setViewerPostId(post.postId);
-            setIsPostMenuOpen(false);
-            void loadPostDetail(post);
-          }}
+          initialPostId={viewerPostId}
           onClose={closeViewer}
-          onDelete={(post, deleteMode) => void deletePost(post, deleteMode)}
-          onLike={(postId) => void likePost(postId)}
-          onTogglePostMenu={(postId) => {
-            setViewerPostId(postId);
-            setIsPostMenuOpen((isOpen) => !isOpen);
-          }}
-          postDetails={postDetails}
-          postError={postError}
+          onPostDeleted={removePost}
           posts={posts}
+          username={username}
         />
       ) : null}
 

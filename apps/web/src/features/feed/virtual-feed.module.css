@@ -1,0 +1,21 @@
+.viewer {
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: pinch-zoom;
+}
+
+.track {
+  position: relative;
+  transition: transform 200ms ease;
+  will-change: transform;
+  width: 100%;
+}
+
+.item {
+  height: 100dvh;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}

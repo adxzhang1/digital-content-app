@@ -26,6 +26,7 @@ export type ProfilePostSummary = {
   caption: string;
   status: string;
   thumbnail: ProfilePostMedia | null;
+  mediaCount: number;
   createdAt: string;
   likeCount: number;
 };

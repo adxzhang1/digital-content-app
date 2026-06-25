@@ -62,6 +62,7 @@ const toPostSummaryResponse = async (post: RawPost) => ({
   caption: String(post.caption ?? ""),
   status: String(post.status ?? "READY"),
   thumbnail: await toThumbnailResponse(post.media),
+  mediaCount: Array.isArray(post.media) ? post.media.length : 0,
   createdAt: String(post.createdAt),
   likeCount: Number(post.likeCount ?? 0)
 });

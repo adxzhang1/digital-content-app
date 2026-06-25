@@ -1,361 +1,281 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent, TouchEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { VirtualFeed } from "@/features/feed/virtual-feed";
+import { getCurrentIdToken } from "@/lib/auth-client";
+import { publicConfig } from "@/lib/config";
+import { isAuthSessionReady, useAuth } from "../../auth-provider";
 import { PostFeedItem, type DeleteMode } from "./post-feed-item";
 import styles from "./post-feed-viewer.module.css";
 import type { ProfilePostDetail, ProfilePostSummary } from "./profile-data";
 
 type PostFeedViewerProps = {
-  activePostId: string | null;
-  currentProfileId?: string;
-  isDeletingPost: boolean;
-  isLoadingPost: boolean;
-  isPostMenuOpen: boolean;
-  likedPostIds: Set<string>;
-  likeCounts: Record<string, number>;
-  onActivePostChange: (post: ProfilePostSummary) => void;
+  initialPostId: string;
   onClose: () => void;
-  onDelete: (post: ProfilePostDetail, deleteMode?: DeleteMode) => void;
-  onLike: (postId: string) => void;
-  onTogglePostMenu: (postId: string) => void;
-  postDetails: Record<string, ProfilePostDetail>;
-  postError: string | null;
+  onPostDeleted: (postId: string) => void;
   posts: ProfilePostSummary[];
+  username: string;
 };
 
-type DragPoint = {
-  x: number;
-  y: number;
+type FeedPost = ProfilePostSummary & {
+  id: string;
 };
 
-const DRAG_AXIS_LOCK_RATIO = 1.2;
-const FEED_TRANSITION_MS = 200;
-const DRAG_DISTANCE_RATIO = 0.14;
-const DRAG_EDGE_RESISTANCE = 0.18;
-const MAX_SWIPE_THRESHOLD = 96;
-
-const clampIndex = (index: number, length: number) =>
-  length <= 0 ? 0 : Math.min(length - 1, Math.max(0, index));
+const apiBaseUrl = publicConfig.apiBaseUrl;
 
 export function PostFeedViewer({
-  activePostId,
-  currentProfileId,
-  isDeletingPost,
-  isLoadingPost,
-  isPostMenuOpen,
-  likedPostIds,
-  likeCounts,
-  onActivePostChange,
+  initialPostId,
   onClose,
-  onDelete,
-  onLike,
-  onTogglePostMenu,
-  postDetails,
-  postError,
+  onPostDeleted,
   posts,
+  username,
 }: PostFeedViewerProps) {
-  const feedRef = useRef<HTMLDivElement | null>(null);
-  const feedSettleTimerRef = useRef<number | null>(null);
-  const feedTransitionFrameRef = useRef<number | null>(null);
-  const feedDragRef = useRef<DragPoint | null>(null);
-  const initialPostIndex = Math.max(
-    0,
-    posts.findIndex((post) => post.postId === activePostId)
-  );
-  const [activeFeedIndex, setActiveFeedIndex] = useState(initialPostIndex);
-  const [feedDragOffset, setFeedDragOffset] = useState(0);
-  const [feedHeight, setFeedHeight] = useState(0);
-  const [isFeedDragging, setIsFeedDragging] = useState(false);
-  const [isFeedTransitionDisabled, setIsFeedTransitionDisabled] =
-    useState(true);
+  const auth = useAuth();
+  const isAccountReady = isAuthSessionReady(auth.session);
+  const currentProfileId = isAccountReady ? auth.account?.profileId : undefined;
+  const [activePostId, setActivePostId] = useState(initialPostId);
+  const [postDetails, setPostDetails] = useState<
+    Record<string, ProfilePostDetail>
+  >({});
+  const [postError, setPostError] = useState<string | null>(null);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [isImageCover, setIsImageCover] = useState(false);
-  const visibleFeedIndex = clampIndex(activeFeedIndex, posts.length);
-  const feedContentHeight =
-    feedHeight > 0
-      ? `${posts.length * feedHeight}px`
-      : "100dvh";
-  const feedTrackOffset = -(visibleFeedIndex * feedHeight) + feedDragOffset;
-  const shouldDisableFeedTransition =
-    isFeedDragging || isFeedTransitionDisabled;
-  const virtualPosts = posts
-    .map((post, index) => ({
-      index,
-      post,
-    }))
-    .filter(({ index }) =>
-      feedHeight > 0
-        ? Math.abs(index - visibleFeedIndex) <= 1
-        : index === visibleFeedIndex
-    );
-  const feedTrackStyle = {
-    height: feedContentHeight,
-    transform: `translate3d(0, ${feedTrackOffset}px, 0)`,
-    transition: shouldDisableFeedTransition ? "none" : undefined,
-  } satisfies CSSProperties;
-
-  const clearFeedSettleTimer = useCallback(() => {
-    if (feedSettleTimerRef.current !== null) {
-      window.clearTimeout(feedSettleTimerRef.current);
-      feedSettleTimerRef.current = null;
-    }
+  const feedPosts = useMemo(
+    () => posts.map((post) => ({ ...post, id: post.postId })),
+    [posts]
+  );
+  const activePost = useMemo(
+    () => posts.find((post) => post.postId === activePostId),
+    [activePostId, posts]
+  );
+  const activePostDetail = activePost ? postDetails[activePost.postId] : null;
+  const handleToggleImageFit = useCallback(() => {
+    setIsImageCover((currentValue) => !currentValue);
   }, []);
+  const handleActivePostChange = useCallback(
+    (post: FeedPost) => {
+      setActivePostId(post.postId);
+      setPostError(null);
+    },
+    []
+  );
+  const handleLikePost = useCallback(
+    async (postId: string) => {
+      if (likedPostIds.has(postId)) {
+        return;
+      }
 
-  const clearFeedTransitionFrame = useCallback(() => {
-    if (feedTransitionFrameRef.current !== null) {
-      window.cancelAnimationFrame(feedTransitionFrameRef.current);
-      feedTransitionFrameRef.current = null;
-    }
-  }, []);
+      setLikedPostIds((currentIds) => new Set(currentIds).add(postId));
 
-  const disableFeedTransition = useCallback(() => {
-    setIsFeedTransitionDisabled(true);
-  }, []);
+      if (!isAccountReady) {
+        return;
+      }
 
-  const enableFeedTransitionNextFrame = useCallback(() => {
-    clearFeedTransitionFrame();
+      try {
+        const idToken = await getCurrentIdToken();
+        const response = await fetch(
+          `${apiBaseUrl}/profiles/${username}/posts/${postId}/like`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
+          }
+        );
+        const data = (await response.json()) as { message?: string };
 
-    feedTransitionFrameRef.current = window.requestAnimationFrame(() => {
-      setIsFeedTransitionDisabled(false);
-      setFeedDragOffset(0);
-      feedTransitionFrameRef.current = null;
-    });
-  }, [clearFeedTransitionFrame]);
+        if (!response.ok) {
+          throw new Error(data.message ?? "Could not like post.");
+        }
+      } catch {
+        setLikedPostIds((currentIds) => {
+          const nextIds = new Set(currentIds);
+          nextIds.delete(postId);
+          return nextIds;
+        });
+      }
+    },
+    [isAccountReady, likedPostIds, username]
+  );
+  const handleDeletePost = useCallback(
+    async (post: ProfilePostDetail, deleteMode: DeleteMode = "soft") => {
+      if (!isAccountReady || auth.account?.profileId !== post.profileId) {
+        return;
+      }
+
+      setIsDeletingPost(true);
+      setPostError(null);
+
+      try {
+        const idToken = await getCurrentIdToken();
+        const forceDeleteQuery =
+          deleteMode === "force" ? "?deleteMode=force" : "";
+        const response = await fetch(
+          `${apiBaseUrl}/profiles/${username}/posts/${post.postId}${forceDeleteQuery}`,
+          {
+            method: "DELETE",
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
+          }
+        );
+        const data = (await response.json()) as { message?: string };
+
+        if (!response.ok) {
+          throw new Error(data.message ?? "Could not delete post.");
+        }
+
+        setLikedPostIds((currentIds) => {
+          const nextIds = new Set(currentIds);
+          nextIds.delete(post.postId);
+          return nextIds;
+        });
+        setPostDetails((currentDetails) => {
+          const nextDetails = { ...currentDetails };
+          delete nextDetails[post.postId];
+          return nextDetails;
+        });
+        onPostDeleted(post.postId);
+        onClose();
+      } catch (error) {
+        setPostError(
+          error instanceof Error ? error.message : "Could not delete post."
+        );
+      } finally {
+        setIsDeletingPost(false);
+      }
+    },
+    [
+      auth.account?.profileId,
+      isAccountReady,
+      onClose,
+      onPostDeleted,
+      username,
+    ]
+  );
 
   useEffect(() => {
-    const feed = feedRef.current;
-
-    if (!feed) {
+    if (!activePost || !isAccountReady || activePostDetail) {
       return;
     }
 
-    const updateFeedHeight = () => {
-      setFeedHeight(feed.clientHeight);
-    };
-    const resizeObserver = new ResizeObserver(updateFeedHeight);
-    const frameId = window.requestAnimationFrame(updateFeedHeight);
+    let isActive = true;
+    const postToLoad = activePost;
 
-    resizeObserver.observe(feed);
+    async function loadActivePostDetail() {
+      try {
+        const idToken = await getCurrentIdToken();
+        const response = await fetch(
+          `${apiBaseUrl}/profiles/${username}/posts/${postToLoad.postId}`,
+          {
+            headers: {
+              authorization: `Bearer ${idToken}`,
+            },
+          }
+        );
+        const data = (await response.json()) as {
+          post?: ProfilePostDetail;
+          message?: string;
+        };
+        const detailPost = data.post;
+
+        if (!response.ok || !detailPost) {
+          throw new Error(data.message ?? "Could not load post.");
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        setPostDetails((currentDetails) => ({
+          ...currentDetails,
+          [detailPost.postId]: detailPost,
+        }));
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        setPostError(
+          error instanceof Error ? error.message : "Could not load post."
+        );
+      }
+    }
+
+    void loadActivePostDetail();
 
     return () => {
-      window.cancelAnimationFrame(frameId);
-      resizeObserver.disconnect();
+      isActive = false;
     };
-  }, []);
+  }, [activePost, activePostDetail, isAccountReady, username]);
+  const renderFeedPost = useCallback(
+    (post: FeedPost, { isActive }: { isActive: boolean }) => {
+      const detailPost = postDetails[post.postId];
+      const resolvedPost = detailPost ?? post;
+      const canManagePost =
+        detailPost && currentProfileId === detailPost.profileId;
+      const isLiked = likedPostIds.has(post.postId);
+      const likeCount = resolvedPost.likeCount + (isLiked ? 1 : 0);
 
-  useEffect(() => {
-    return () => {
-      clearFeedSettleTimer();
-      clearFeedTransitionFrame();
-    };
-  }, [clearFeedSettleTimer, clearFeedTransitionFrame]);
-
-  useEffect(() => {
-    if (feedHeight > 0 && isFeedTransitionDisabled) {
-      enableFeedTransitionNextFrame();
-    }
-  }, [enableFeedTransitionNextFrame, feedHeight, isFeedTransitionDisabled]);
-
-  function settleFeedIndex(index: number, offset: number) {
-    const nextIndex = clampIndex(index, posts.length);
-    const nextPost = posts[nextIndex];
-
-    if (!nextPost || nextIndex === visibleFeedIndex) {
-      setFeedDragOffset(0);
-      return;
-    }
-
-    clearFeedSettleTimer();
-
-    setFeedDragOffset(offset);
-
-    feedSettleTimerRef.current = window.setTimeout(() => {
-      disableFeedTransition();
-      setActiveFeedIndex(nextIndex);
-      setFeedDragOffset(0);
-      feedSettleTimerRef.current = null;
-      enableFeedTransitionNextFrame();
-
-      if (nextPost.postId !== activePostId) {
-        onActivePostChange(nextPost);
-      }
-    }, FEED_TRANSITION_MS);
-  }
-
-  function handleFeedPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!event.isPrimary) {
-      return;
-    }
-
-    if (posts.length < 2 || feedSettleTimerRef.current !== null) {
-      return;
-    }
-
-    feedDragRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-    };
-    setIsFeedDragging(true);
-  }
-
-  function handleFeedPointerMove(event: PointerEvent<HTMLDivElement>) {
-    const drag = feedDragRef.current;
-
-    if (!drag) {
-      return;
-    }
-
-    const deltaX = event.clientX - drag.x;
-    const deltaY = event.clientY - drag.y;
-
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      return;
-    }
-
-    const isDraggingBeforeFirstPost = visibleFeedIndex === 0 && deltaY > 0;
-    const isDraggingAfterLastPost =
-      visibleFeedIndex === posts.length - 1 && deltaY < 0;
-
-    setFeedDragOffset(
-      isDraggingBeforeFirstPost || isDraggingAfterLastPost
-        ? deltaY * DRAG_EDGE_RESISTANCE
-        : deltaY
-    );
-  }
-
-  function finishFeedDrag(event: PointerEvent<HTMLDivElement>) {
-    if (!event.isPrimary) {
-      return;
-    }
-
-    const drag = feedDragRef.current;
-    feedDragRef.current = null;
-    setIsFeedDragging(false);
-
-    if (!drag) {
-      return;
-    }
-
-    const deltaX = event.clientX - drag.x;
-    const deltaY = event.clientY - drag.y;
-    const shouldChangePost =
-      Math.abs(deltaY) >
-        Math.min(
-          feedHeight * DRAG_DISTANCE_RATIO,
-          MAX_SWIPE_THRESHOLD
-        ) &&
-      Math.abs(deltaY) > Math.abs(deltaX) * DRAG_AXIS_LOCK_RATIO;
-
-    if (shouldChangePost) {
-      const direction = deltaY < 0 ? 1 : -1;
-      const nextIndex = visibleFeedIndex + direction;
-
-      if (nextIndex >= 0 && nextIndex < posts.length) {
-        settleFeedIndex(nextIndex, -direction * feedHeight);
-      } else {
-        setFeedDragOffset(0);
-      }
-      return;
-    }
-
-    setFeedDragOffset(0);
-  }
-
-  function cancelFeedDrag() {
-    if (feedDragRef.current) {
-      feedDragRef.current = null;
-      setIsFeedDragging(false);
-      setFeedDragOffset(0);
-    }
-  }
-
-  function handleFeedTouch(event: TouchEvent<HTMLDivElement>) {
-    if (event.touches.length > 1) {
-      cancelFeedDrag();
-    }
-  }
+      return (
+        <PostFeedItem
+          canManagePost={Boolean(canManagePost)}
+          isImageCover={isImageCover}
+          isDeletingPost={isDeletingPost}
+          isActive={isActive}
+          isLiked={isLiked}
+          likeCount={likeCount}
+          onDelete={(post, deleteMode) => void handleDeletePost(post, deleteMode)}
+          onToggleImageFit={handleToggleImageFit}
+          onLike={(postId) => void handleLikePost(postId)}
+          post={post}
+          postError={
+            postError && post.postId === activePostId ? postError : null
+          }
+          resolvedPost={resolvedPost}
+        />
+      );
+    },
+    [
+      activePostId,
+      currentProfileId,
+      handleDeletePost,
+      handleLikePost,
+      handleToggleImageFit,
+      isDeletingPost,
+      isImageCover,
+      likedPostIds,
+      postDetails,
+      postError,
+    ]
+  );
 
   return (
     <div
-      aria-label="Post feed"
+      aria-label="Feed"
       aria-modal="true"
       className={styles.modalBackdrop}
       role="dialog"
     >
       <article className={styles.modal}>
-        {activePostId ? (
-          <div
-            className={styles.feedViewer}
-            onPointerCancel={cancelFeedDrag}
-            onPointerDown={handleFeedPointerDown}
-            onPointerLeave={cancelFeedDrag}
-            onPointerMove={handleFeedPointerMove}
-            onPointerUp={finishFeedDrag}
-            onTouchMove={handleFeedTouch}
-            onTouchStart={handleFeedTouch}
-            ref={feedRef}
+        <div className={styles.feedShell}>
+          <VirtualFeed
+            activeItemId={activePostId}
+            ariaLabel="Post feed"
+            items={feedPosts}
+            onActiveItemChange={handleActivePostChange}
+            renderItem={renderFeedPost}
+          />
+          <button
+            aria-label="Close post"
+            className={styles.modalClose}
+            onClick={onClose}
+            type="button"
           >
-            <div className={styles.feedTrack} style={feedTrackStyle}>
-              {virtualPosts.map(({ index, post }) => {
-                const detailPost = postDetails[post.postId];
-                const resolvedPost = detailPost ?? post;
-                const canManagePost =
-                  detailPost && currentProfileId === detailPost.profileId;
-                const feedItemStyle = {
-                  top:
-                    feedHeight > 0
-                      ? `${index * feedHeight}px`
-                      : "0",
-                } satisfies CSSProperties;
-
-                return (
-                  <PostFeedItem
-                    canManagePost={Boolean(canManagePost)}
-                    isImageCover={isImageCover}
-                    isDeletingPost={isDeletingPost}
-                    isActive={index === visibleFeedIndex}
-                    isLiked={likedPostIds.has(post.postId)}
-                    isMenuOpen={isPostMenuOpen && post.postId === activePostId}
-                    key={post.postId}
-                    likeCount={likeCounts[post.postId] ?? 0}
-                    onDelete={onDelete}
-                    onToggleImageFit={() =>
-                      setIsImageCover((currentValue) => !currentValue)
-                    }
-                    onLike={onLike}
-                    onToggleMenu={onTogglePostMenu}
-                    post={post}
-                    postError={
-                      postError && post.postId === activePostId
-                        ? postError
-                        : null
-                    }
-                    resolvedPost={resolvedPost}
-                    style={feedItemStyle}
-                  />
-                );
-              })}
-            </div>
-            <button
-              aria-label="Close post"
-              className={styles.modalClose}
-              onClick={onClose}
-              type="button"
-            >
-              ×
-            </button>
-          </div>
-        ) : (
-          <div className={styles.modalVisual} />
-        )}
-        {!activePostId ? (
-          <div className={styles.modalLoading}>
-            <button aria-label="Close post" onClick={onClose} type="button">
-              ×
-            </button>
-            <p>{postError ?? (isLoadingPost ? "Fetching post details..." : "")}</p>
-          </div>
-        ) : null}
+            ×
+          </button>
+        </div>
       </article>
     </div>
   );

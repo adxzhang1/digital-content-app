@@ -12,25 +12,14 @@
   width: 100%;
 }
 
-.feedViewer {
+.feedShell {
   height: 100dvh;
-  overflow: hidden;
-  touch-action: pinch-zoom;
-}
-
-.feedTrack {
   position: relative;
-  transition: transform 200ms ease;
-  will-change: transform;
-  width: 100%;
 }
 
 .feedItem {
   height: 100dvh;
-  left: 0;
   overflow: hidden;
-  position: absolute;
-  top: 0;
   width: 100%;
 }
 
@@ -39,32 +28,6 @@
   overflow: hidden;
   position: relative;
   user-select: none;
-}
-
-.carouselViewport {
-  height: 100dvh;
-  overflow: hidden;
-  position: relative;
-  touch-action: pinch-zoom;
-  width: 100%;
-}
-
-.carouselTrack {
-  height: 100dvh;
-  position: relative;
-  transition: transform 200ms ease;
-  will-change: transform;
-}
-
-.carouselSlide {
-  backface-visibility: hidden;
-  height: 100dvh;
-  left: 0;
-  overflow: hidden;
-  position: absolute;
-  top: 0;
-  transform: translateZ(0);
-  width: 100%;
 }
 
 .modalImage {
@@ -80,67 +43,6 @@
 
 .modalImageCover {
   object-fit: cover;
-}
-
-.carouselButton {
-  align-items: center;
-  background: rgba(0, 0, 0, 0.42);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
-  color: #ffffff;
-  cursor: pointer;
-  display: flex;
-  height: 42px;
-  justify-content: center;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 42px;
-  z-index: 2;
-}
-
-.carouselButton svg {
-  fill: none;
-  height: 24px;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  width: 24px;
-}
-
-.carouselButton:disabled {
-  cursor: default;
-  opacity: 0.35;
-}
-
-.carouselPrevious {
-  left: 24px;
-}
-
-.carouselNext {
-  right: 24px;
-}
-
-.carouselDots {
-  bottom: 18px;
-  display: flex;
-  gap: 6px;
-  left: 50%;
-  position: absolute;
-  transform: translateX(-50%);
-  z-index: 2;
-}
-
-.carouselDots span {
-  background: rgba(255, 255, 255, 0.42);
-  border-radius: 999px;
-  height: 6px;
-  width: 6px;
-}
-
-.carouselDots .carouselDotActive {
-  background: #ffffff;
 }
 
 .modalLike,
@@ -175,8 +77,7 @@
   width: 32px;
 }
 
-.modalClose,
-.modalLoading button {
+.modalClose {
   background: rgba(0, 0, 0, 0.48);
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 50%;
@@ -292,15 +193,6 @@
   font-size: 0.9rem;
 }
 
-.modalLoading {
-  align-items: center;
-  color: #ffffff;
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  position: absolute;
-}
-
 @media (max-width: 720px) {
   .modalContent {
     bottom: 22px;
@@ -320,16 +212,4 @@
     width: 38px;
   }
 
-  .carouselButton {
-    height: 38px;
-    width: 38px;
-  }
-
-  .carouselPrevious {
-    left: 12px;
-  }
-
-  .carouselNext {
-    right: 12px;
-  }
 }
