@@ -19,6 +19,7 @@ export type AppAccount = {
   userId: string;
   profileId: string;
   username: string;
+  displayName: string;
   email: string;
 };
 

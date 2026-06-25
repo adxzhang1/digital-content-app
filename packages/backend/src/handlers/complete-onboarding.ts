@@ -159,7 +159,8 @@ export async function handler(
       userId,
       email,
       profileId,
-      username
+      username,
+      displayName
     },
     profile
   });

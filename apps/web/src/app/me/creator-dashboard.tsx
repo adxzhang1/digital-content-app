@@ -66,7 +66,7 @@ export function CreatorDashboard() {
     );
   }
 
-  const displayName = activeProfile?.displayName ?? auth.account.username;
+  const displayName = activeProfile?.displayName ?? auth.account.displayName;
   const bio = activeProfile?.bio ?? "";
   const postCount = activeProfile?.counts.posts ?? 0;
   const likeCount = activeProfile?.counts.likes ?? "0";

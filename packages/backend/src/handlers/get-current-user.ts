@@ -39,9 +39,11 @@ export async function handler(
       }
     })
   );
-  const username = profileResult.Item?.username;
+  const profile = profileResult.Item;
+  const username = profile?.username;
+  const displayName = profile?.displayName;
 
-  if (!username) {
+  if (!username || !displayName) {
     return json(500, {
       code: "PROFILE_NOT_FOUND",
       message: "Profile could not be loaded."
@@ -55,7 +57,8 @@ export async function handler(
       email: user.email ?? "",
       userId: user.userId,
       profileId: user.profileId,
-      username: String(username)
+      username: String(username),
+      displayName: String(displayName)
     }
   });
 }
