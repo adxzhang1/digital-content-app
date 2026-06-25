@@ -154,6 +154,11 @@ export function CreatePostForm({ profileId }: CreatePostFormProps) {
 
   function handleFilesChange(selectedFiles: FileList | null) {
     const nextFiles = Array.from(selectedFiles ?? []);
+
+    if (nextFiles.length === 0) {
+      return;
+    }
+
     const invalidFile = nextFiles.find((file) => !isAllowedImageType(file.type));
 
     replaceFiles(nextFiles);
