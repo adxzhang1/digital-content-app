@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
-import { publicConfig } from "@/lib/config";
 import { TopNav } from "../../top-nav";
 import styles from "./page.module.css";
 import { ProfilePostGrid } from "./profile-post-grid";
-import { type Profile } from "./profile-data";
+import { getProfile } from "@/features/profile/profile-api";
 
 type ProfilePageProps = {
   params: Promise<{
@@ -11,30 +10,15 @@ type ProfilePageProps = {
   }>;
 };
 
-const apiBaseUrl = publicConfig.apiBaseUrl;
-
-async function getProfile(username: string): Promise<Profile> {
-  const profileUrl = `${apiBaseUrl}/profiles/${username}`;
-
-  const response = await fetch(profileUrl, {
+export default async function ProfilePage({ params }: ProfilePageProps) {
+  const { username } = await params;
+  const profile = await getProfile(username, {
     cache: "no-store",
   });
 
-  if (response.status === 404) {
+  if (!profile) {
     notFound();
   }
-
-  if (!response.ok) {
-    throw new Error("Could not load profile.");
-  }
-
-  const data = (await response.json()) as { profile: Profile };
-  return data.profile;
-}
-
-export default async function ProfilePage({ params }: ProfilePageProps) {
-  const { username } = await params;
-  const profile = await getProfile(username);
 
   return (
     <main className={styles.page}>

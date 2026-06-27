@@ -1,30 +1,18 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, PointerEvent } from "react";
-import { getCurrentIdToken } from "@/lib/auth-client";
-import { publicConfig } from "@/lib/config";
+import { profileQueryKey } from "@/features/profile/profile-api";
+import { profilePostsQueryKey } from "@/features/profile/profile-post-api";
+import {
+  createPost,
+  getPostUploadUrls,
+  uploadFile,
+  waitForPostStatus,
+  type UploadMedia,
+} from "@/features/create-post/create-post-api";
 import styles from "./page.module.css";
-
-type PostProcessingStatus = "PROCESSING" | "READY" | "FAILED" | "DELETED";
-
-type UploadMedia = {
-  mediaId: string;
-  position: number;
-  type: "IMAGE";
-  contentType: "image/jpeg" | "image/png" | "image/webp";
-  originalKey: string;
-  uploadUrl: string;
-};
-
-type PostStatus = {
-  postId: string;
-  profileId: string;
-  status: PostProcessingStatus;
-  media: unknown[];
-  createdAt: string;
-  updatedAt: string;
-};
 
 type FilePreview = {
   file: File;
@@ -41,7 +29,6 @@ type Status =
       message: string;
     };
 
-const apiBaseUrl = publicConfig.apiBaseUrl;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 
 const getSelectedImagesMessage = (count: number) =>
@@ -51,69 +38,16 @@ function isAllowedImageType(type: string): type is UploadMedia["contentType"] {
   return allowedImageTypes.includes(type as UploadMedia["contentType"]);
 }
 
-function uploadFile(file: File, uploadUrl: string, onProgress: (loaded: number) => void) {
-  return new Promise<void>((resolve, reject) => {
-    const request = new XMLHttpRequest();
-
-    request.upload.addEventListener("progress", (event) => {
-      if (event.lengthComputable) {
-        onProgress(event.loaded);
-      }
-    });
-    request.addEventListener("load", () => {
-      if (request.status >= 200 && request.status < 300) {
-        onProgress(file.size);
-        resolve();
-        return;
-      }
-
-      reject(new Error("Image upload failed."));
-    });
-    request.addEventListener("error", () => reject(new Error("Image upload failed.")));
-    request.open("PUT", uploadUrl);
-    request.setRequestHeader("content-type", file.type);
-    request.send(file);
-  });
-}
-
-async function waitForPostStatus(
-  postId: string,
-  idToken: string
-): Promise<PostStatus> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const response = await fetch(`${apiBaseUrl}/posts/${postId}`, {
-      headers: {
-        authorization: `Bearer ${idToken}`,
-      },
-    });
-    const data = (await response.json()) as {
-      post?: PostStatus;
-      message?: string;
-    };
-
-    if (!response.ok || !data.post) {
-      throw new Error(data.message ?? "Could not load post status.");
-    }
-
-    if (
-      data.post.status === "READY" ||
-      data.post.status === "FAILED" ||
-      data.post.status === "DELETED"
-    ) {
-      return data.post;
-    }
-
-    await new Promise((resolve) => window.setTimeout(resolve, 1500));
-  }
-
-  throw new Error("Post is still processing. Check back shortly.");
-}
-
 type CreatePostFormProps = {
   profileId: string;
+  username: string;
 };
 
-export function CreatePostForm({ profileId }: CreatePostFormProps) {
+export function CreatePostForm({
+  profileId,
+  username,
+}: CreatePostFormProps) {
+  const queryClient = useQueryClient();
   const [caption, setCaption] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<FilePreview[]>([]);
@@ -121,13 +55,89 @@ export function CreatePostForm({ profileId }: CreatePostFormProps) {
   const filePreviewsRef = useRef<FilePreview[]>([]);
   const draggedFileIndexRef = useRef<number | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState<Status>({
     tone: "idle",
     message: "Ready to publish.",
   });
+  const { isPending: isSubmitting, mutateAsync: submitPost } = useMutation({
+    mutationFn: async ({
+      caption,
+      files,
+    }: {
+      caption: string;
+      files: File[];
+    }) => {
+      setStatus({
+        tone: "idle",
+        message: "Preparing image uploads...",
+      });
+      const uploadData = await getPostUploadUrls({
+        files,
+        profileId,
+      });
 
+      const loadedByFile = new Array(files.length).fill(0) as number[];
+      const totalBytes = files.reduce((total, file) => total + file.size, 0);
+      const updateProgress = (index: number, loaded: number) => {
+        loadedByFile[index] = loaded;
+        const totalLoaded = loadedByFile.reduce(
+          (total, current) => total + current,
+          0
+        );
+        setUploadProgress(Math.round((totalLoaded / totalBytes) * 100));
+      };
+
+      setStatus({
+        tone: "idle",
+        message: "Uploading images...",
+      });
+
+      await Promise.all(
+        files.map((file, index) =>
+          uploadFile(file, uploadData.media[index].uploadUrl, (loaded) =>
+            updateProgress(index, loaded)
+          )
+        )
+      );
+
+      setStatus({
+        tone: "idle",
+        message: "Processing images...",
+      });
+
+      await createPost({
+        caption,
+        idToken: uploadData.idToken,
+        media: uploadData.media,
+        postId: uploadData.postId,
+        profileId,
+      });
+
+      const completedPost = await waitForPostStatus(
+        uploadData.postId,
+        uploadData.idToken
+      );
+
+      if (completedPost.status === "FAILED") {
+        throw new Error("Image processing failed.");
+      }
+
+      if (completedPost.status === "DELETED") {
+        throw new Error("Post was deleted before processing finished.");
+      }
+
+      return completedPost;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: profileQueryKey(username),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: profilePostsQueryKey(username),
+      });
+    },
+  });
   const canSubmit = files.length > 0 && files.length <= 10 && !isSubmitting;
 
   useEffect(() => {
@@ -275,104 +285,13 @@ export function CreatePostForm({ profileId }: CreatePostFormProps) {
       return;
     }
 
-    setIsSubmitting(true);
     setUploadProgress(0);
 
     try {
-      const idToken = await getCurrentIdToken();
-      setStatus({
-        tone: "idle",
-        message: "Preparing image uploads...",
+      await submitPost({
+        caption: trimmedCaption,
+        files,
       });
-
-      const uploadUrlResponse = await fetch(`${apiBaseUrl}/posts/upload-urls`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${idToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          profileId,
-          images: files.map((file) => ({
-            contentType: file.type,
-          })),
-        }),
-      });
-
-      const uploadUrlData = (await uploadUrlResponse.json()) as {
-        postId?: string;
-        media?: UploadMedia[];
-        message?: string;
-      };
-
-      if (!uploadUrlResponse.ok || !uploadUrlData.postId || !uploadUrlData.media) {
-        throw new Error(uploadUrlData.message ?? "Could not prepare uploads.");
-      }
-
-      const loadedByFile = new Array(files.length).fill(0) as number[];
-      const totalBytes = files.reduce((total, file) => total + file.size, 0);
-      const updateProgress = (index: number, loaded: number) => {
-        loadedByFile[index] = loaded;
-        const totalLoaded = loadedByFile.reduce((total, current) => total + current, 0);
-        setUploadProgress(Math.round((totalLoaded / totalBytes) * 100));
-      };
-
-      setStatus({
-        tone: "idle",
-        message: "Uploading images...",
-      });
-
-      await Promise.all(
-        files.map((file, index) =>
-          uploadFile(file, uploadUrlData.media![index].uploadUrl, (loaded) =>
-            updateProgress(index, loaded)
-          )
-        )
-      );
-
-      setStatus({
-        tone: "idle",
-        message: "Processing images...",
-      });
-
-      const finalizeResponse = await fetch(`${apiBaseUrl}/posts`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${idToken}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          postId: uploadUrlData.postId,
-          profileId,
-          caption: trimmedCaption,
-          media: uploadUrlData.media.map((media) => ({
-            mediaId: media.mediaId,
-            position: media.position,
-            type: media.type,
-            originalKey: media.originalKey,
-            contentType: media.contentType,
-          })),
-        }),
-      });
-
-      const finalizeData = (await finalizeResponse.json()) as {
-        post?: unknown;
-        message?: string;
-      };
-
-      if (!finalizeResponse.ok || !finalizeData.post) {
-        throw new Error(finalizeData.message ?? "Could not finalize post.");
-      }
-
-      const completedPost = await waitForPostStatus(uploadUrlData.postId, idToken);
-
-      if (completedPost.status === "FAILED") {
-        throw new Error("Image processing failed.");
-      }
-
-      if (completedPost.status === "DELETED") {
-        throw new Error("Post was deleted before processing finished.");
-      }
 
       setCaption("");
       replaceFiles([]);
@@ -389,8 +308,6 @@ export function CreatePostForm({ profileId }: CreatePostFormProps) {
         message:
           error instanceof Error ? error.message : "Could not create post.",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   }
 

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { ScrollSnapCarousel } from "@/features/feed/scroll-snap-carousel";
 import styles from "./post-feed-viewer.module.css";
-import type { ProfilePostDetail, ProfilePostSummary } from "./profile-data";
+import type {
+  ProfilePostDetail,
+  ProfilePostSummary,
+} from "@/features/profile/profile-data";
 
 type FeedMediaItem = {
   id: string;

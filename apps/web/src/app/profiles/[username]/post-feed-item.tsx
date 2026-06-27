@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { PostMedia } from "./post-media";
 import styles from "./post-feed-viewer.module.css";
-import type { ProfilePostDetail, ProfilePostSummary } from "./profile-data";
+import type {
+  ProfilePostDetail,
+  ProfilePostSummary,
+} from "@/features/profile/profile-data";
 
 export type DeleteMode = "soft" | "force";
 

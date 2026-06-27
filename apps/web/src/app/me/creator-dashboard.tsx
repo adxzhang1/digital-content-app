@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   isAuthSessionLoading,
@@ -8,13 +9,13 @@ import {
   useAuth,
 } from "../auth-provider";
 import { ProfilePostGrid } from "../profiles/[username]/profile-post-grid";
-import type { Profile } from "../profiles/[username]/profile-data";
 import { signOutCurrentUser } from "@/lib/auth-client";
-import { publicConfig } from "@/lib/config";
+import {
+  getProfile,
+  profileQueryKey,
+} from "@/features/profile/profile-api";
 import { CreatePostForm } from "./create-post-form";
 import styles from "./page.module.css";
-
-const apiBaseUrl = publicConfig.apiBaseUrl;
 
 export function CreatorDashboard() {
   const auth = useAuth();
@@ -22,35 +23,21 @@ export function CreatorDashboard() {
   const isAccountLoading = isAuthSessionLoading(auth.session);
   const isAccountReady = isAuthSessionReady(auth.session);
   const username = auth.account?.username;
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const activeProfile = profile?.username === username ? profile : null;
-
-  useEffect(() => {
-    if (!isAccountReady || !username) {
-      return;
-    }
-
-    let isActive = true;
-
-    async function loadProfile() {
-      const response = await fetch(`${apiBaseUrl}/profiles/${username}`);
-      const data = (await response.json()) as {
-        profile?: Profile;
-      };
-
-      if (isActive && response.ok && data.profile) {
-        setProfile(data.profile);
+  const profileQuery = useQuery({
+    enabled: Boolean(isAccountReady && username),
+    queryKey: username ? profileQueryKey(username) : ["profile"],
+    queryFn: () => {
+      if (!username) {
+        throw new Error("Could not load profile.");
       }
-    }
 
-    void loadProfile();
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAccountReady, username]);
+      return getProfile(username);
+    },
+  });
+  const profile = profileQuery.data ?? null;
+  const activeProfile = profile?.username === username ? profile : null;
 
   useEffect(() => {
     if (!isAccountLoading && !isAccountReady) {
@@ -149,7 +136,10 @@ export function CreatorDashboard() {
                 ×
               </button>
             </div>
-            <CreatePostForm profileId={auth.account.profileId} />
+            <CreatePostForm
+              profileId={auth.account.profileId}
+              username={auth.account.username}
+            />
           </section>
         </div>
       ) : null}

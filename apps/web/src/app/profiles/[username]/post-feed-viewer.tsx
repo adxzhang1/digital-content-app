@@ -1,13 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScrollSnapFeed } from "@/features/feed/scroll-snap-feed";
-import { getCurrentIdToken } from "@/lib/auth-client";
-import { publicConfig } from "@/lib/config";
 import { isAuthSessionReady, useAuth } from "../../auth-provider";
+import {
+  deletePost,
+  fetchPostDetail,
+  likePost,
+  postDetailQueryKey,
+} from "@/features/profile/profile-post-api";
 import { PostFeedItem, type DeleteMode } from "./post-feed-item";
 import styles from "./post-feed-viewer.module.css";
-import type { ProfilePostDetail, ProfilePostSummary } from "./profile-data";
+import type {
+  ProfilePostDetail,
+  ProfilePostSummary,
+} from "@/features/profile/profile-data";
 
 type PostFeedViewerProps = {
   initialPostId: string;
@@ -21,8 +29,6 @@ type FeedPost = ProfilePostSummary & {
   id: string;
 };
 
-const apiBaseUrl = publicConfig.apiBaseUrl;
-
 export function PostFeedViewer({
   initialPostId,
   onClose,
@@ -31,15 +37,12 @@ export function PostFeedViewer({
   username,
 }: PostFeedViewerProps) {
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const isAccountReady = isAuthSessionReady(auth.session);
   const currentProfileId = isAccountReady ? auth.account?.profileId : undefined;
   const [activePostId, setActivePostId] = useState(initialPostId);
-  const [postDetails, setPostDetails] = useState<
-    Record<string, ProfilePostDetail>
-  >({});
-  const [postError, setPostError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
-  const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [isImageCover, setIsImageCover] = useState(false);
   const feedPosts = useMemo(
     () => posts.map((post) => ({ ...post, id: post.postId })),
@@ -49,14 +52,68 @@ export function PostFeedViewer({
     () => posts.find((post) => post.postId === activePostId),
     [activePostId, posts]
   );
-  const activePostDetail = activePost ? postDetails[activePost.postId] : null;
+  const activePostDetailQuery = useQuery({
+    enabled: Boolean(activePost && isAccountReady),
+    queryKey: activePost
+      ? postDetailQueryKey(username, activePost.postId)
+      : ["post-detail", username],
+    queryFn: () => {
+      if (!activePost) {
+        throw new Error("Could not load post.");
+      }
+
+      return fetchPostDetail(username, activePost.postId);
+    },
+  });
+  const activePostDetail = activePostDetailQuery.data ?? null;
+  const postError =
+    deleteError ??
+    (activePostDetailQuery.error instanceof Error
+      ? activePostDetailQuery.error.message
+      : null);
+  const { mutate: mutateLikePost } = useMutation({
+    mutationFn: (postId: string) => likePost(username, postId),
+    onError: (_error, postId) => {
+      setLikedPostIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(postId);
+        return nextIds;
+      });
+    },
+  });
+  const { isPending: isDeletingPost, mutate: mutateDeletePost } = useMutation({
+    mutationFn: ({
+      deleteMode,
+      post,
+    }: {
+      deleteMode?: DeleteMode;
+      post: ProfilePostDetail;
+    }) => deletePost({ deleteMode, post, username }),
+    onSuccess: (_data, { post }) => {
+      setLikedPostIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(post.postId);
+        return nextIds;
+      });
+      queryClient.removeQueries({
+        queryKey: postDetailQueryKey(username, post.postId),
+      });
+      onPostDeleted(post.postId);
+      onClose();
+    },
+    onError: (error) => {
+      setDeleteError(
+        error instanceof Error ? error.message : "Could not delete post."
+      );
+    },
+  });
   const handleToggleImageFit = useCallback(() => {
     setIsImageCover((currentValue) => !currentValue);
   }, []);
   const handleActivePostChange = useCallback(
     (post: FeedPost) => {
       setActivePostId(post.postId);
-      setPostError(null);
+      setDeleteError(null);
     },
     []
   );
@@ -72,146 +129,36 @@ export function PostFeedViewer({
         return;
       }
 
-      try {
-        const idToken = await getCurrentIdToken();
-        const response = await fetch(
-          `${apiBaseUrl}/profiles/${username}/posts/${postId}/like`,
-          {
-            method: "POST",
-            headers: {
-              authorization: `Bearer ${idToken}`,
-            },
-          }
-        );
-        const data = (await response.json()) as { message?: string };
-
-        if (!response.ok) {
-          throw new Error(data.message ?? "Could not like post.");
-        }
-      } catch {
-        setLikedPostIds((currentIds) => {
-          const nextIds = new Set(currentIds);
-          nextIds.delete(postId);
-          return nextIds;
-        });
-      }
+      mutateLikePost(postId);
     },
-    [isAccountReady, likedPostIds, username]
+    [isAccountReady, likedPostIds, mutateLikePost]
   );
   const handleDeletePost = useCallback(
-    async (post: ProfilePostDetail, deleteMode: DeleteMode = "soft") => {
+    (post: ProfilePostDetail, deleteMode: DeleteMode = "soft") => {
       if (!isAccountReady || auth.account?.profileId !== post.profileId) {
         return;
       }
 
-      setIsDeletingPost(true);
-      setPostError(null);
-
-      try {
-        const idToken = await getCurrentIdToken();
-        const forceDeleteQuery =
-          deleteMode === "force" ? "?deleteMode=force" : "";
-        const response = await fetch(
-          `${apiBaseUrl}/profiles/${username}/posts/${post.postId}${forceDeleteQuery}`,
-          {
-            method: "DELETE",
-            headers: {
-              authorization: `Bearer ${idToken}`,
-            },
-          }
-        );
-        const data = (await response.json()) as { message?: string };
-
-        if (!response.ok) {
-          throw new Error(data.message ?? "Could not delete post.");
-        }
-
-        setLikedPostIds((currentIds) => {
-          const nextIds = new Set(currentIds);
-          nextIds.delete(post.postId);
-          return nextIds;
-        });
-        setPostDetails((currentDetails) => {
-          const nextDetails = { ...currentDetails };
-          delete nextDetails[post.postId];
-          return nextDetails;
-        });
-        onPostDeleted(post.postId);
-        onClose();
-      } catch (error) {
-        setPostError(
-          error instanceof Error ? error.message : "Could not delete post."
-        );
-      } finally {
-        setIsDeletingPost(false);
-      }
+      setDeleteError(null);
+      mutateDeletePost({ deleteMode, post });
     },
-    [
-      auth.account?.profileId,
-      isAccountReady,
-      onClose,
-      onPostDeleted,
-      username,
-    ]
+    [auth.account?.profileId, isAccountReady, mutateDeletePost]
+  );
+  const getCachedPostDetail = useCallback(
+    (postId: string) =>
+      queryClient.getQueryData<ProfilePostDetail>(
+        postDetailQueryKey(username, postId)
+      ),
+    [queryClient, username]
   );
 
-  useEffect(() => {
-    if (!activePost || !isAccountReady || activePostDetail) {
-      return;
-    }
-
-    let isActive = true;
-    const postToLoad = activePost;
-
-    async function loadActivePostDetail() {
-      try {
-        const idToken = await getCurrentIdToken();
-        const response = await fetch(
-          `${apiBaseUrl}/profiles/${username}/posts/${postToLoad.postId}`,
-          {
-            headers: {
-              authorization: `Bearer ${idToken}`,
-            },
-          }
-        );
-        const data = (await response.json()) as {
-          post?: ProfilePostDetail;
-          message?: string;
-        };
-        const detailPost = data.post;
-
-        if (!response.ok || !detailPost) {
-          throw new Error(data.message ?? "Could not load post.");
-        }
-
-        if (!isActive) {
-          return;
-        }
-
-        setPostDetails((currentDetails) => ({
-          ...currentDetails,
-          [detailPost.postId]: detailPost,
-        }));
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-
-        setPostError(
-          error instanceof Error ? error.message : "Could not load post."
-        );
-      }
-    }
-
-    void loadActivePostDetail();
-
-    return () => {
-      isActive = false;
-    };
-  }, [activePost, activePostDetail, isAccountReady, username]);
   const renderFeedPost = useCallback(
     (post: FeedPost, { isActive }: { isActive: boolean }) => {
-      const detailPost = postDetails[post.postId];
+      const cachedPostDetail = getCachedPostDetail(post.postId);
+      const detailPost =
+        post.postId === activePostId
+          ? activePostDetail ?? cachedPostDetail
+          : cachedPostDetail;
       const resolvedPost = detailPost ?? post;
       const canManagePost =
         detailPost && currentProfileId === detailPost.profileId;
@@ -239,14 +186,15 @@ export function PostFeedViewer({
     },
     [
       activePostId,
+      activePostDetail,
       currentProfileId,
+      getCachedPostDetail,
       handleDeletePost,
       handleLikePost,
       handleToggleImageFit,
       isDeletingPost,
       isImageCover,
       likedPostIds,
-      postDetails,
       postError,
     ]
   );

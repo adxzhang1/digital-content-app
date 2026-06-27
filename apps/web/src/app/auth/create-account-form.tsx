@@ -1,9 +1,10 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
 import { useAuth } from "../auth-provider";
-import { createFirebaseUser, getCurrentIdToken } from "@/lib/auth-client";
-import { publicConfig } from "@/lib/config";
+import { createFirebaseUser } from "@/lib/auth-client";
+import { completeOnboarding } from "@/features/auth/account-api";
 import styles from "./page.module.css";
 
 type SignUpStep = "account" | "profile";
@@ -18,8 +19,6 @@ type CreateAccountFormProps = {
   onSignOut?: () => void;
   onSignIn: () => void;
 };
-
-const apiBaseUrl = publicConfig.apiBaseUrl;
 
 export function CreateAccountForm({
   onAccountCreated,
@@ -39,28 +38,9 @@ export function CreateAccountForm({
     tone: "idle",
     message: "",
   });
-
-  async function createInternalAccount() {
-    const idToken = await getCurrentIdToken();
-    const response = await fetch(`${apiBaseUrl}/me/onboarding`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${idToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        username,
-        displayName,
-      }),
-    });
-    const data = (await response.json()) as {
-      message?: string;
-    };
-
-    if (!response.ok) {
-      throw new Error(data.message ?? "Could not create account profile.");
-    }
-  }
+  const onboardingMutation = useMutation({
+    mutationFn: completeOnboarding,
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -89,7 +69,10 @@ export function CreateAccountForm({
         tone: "idle",
         message: "Creating profile...",
       });
-      await createInternalAccount();
+      await onboardingMutation.mutateAsync({
+        displayName,
+        username,
+      });
       setStatus({
         tone: "success",
         message: "Account ready.",

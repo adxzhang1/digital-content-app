@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { User, onAuthStateChanged } from "firebase/auth";
 import {
   useCallback,
@@ -7,21 +8,20 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { firebaseAuth } from "@/lib/firebase";
-import { publicConfig } from "@/lib/config";
+import {
+  accountQueryKey,
+  fetchAccount,
+  type AppAccount,
+} from "@/features/auth/account-api";
+import {
+  postDetailQueryRoot,
+  profilePostsQueryRoot,
+} from "@/features/profile/profile-post-api";
 
 export type AccountState = "unauthenticated" | "needs_onboarding" | "ready";
-
-export type AppAccount = {
-  userId: string;
-  profileId: string;
-  username: string;
-  displayName: string;
-  email: string;
-};
 
 export type AuthSessionState =
   | { status: "checking_firebase" }
@@ -30,12 +30,6 @@ export type AuthSessionState =
   | { status: "needs_onboarding"; firebaseUser: User }
   | { status: "ready"; account: AppAccount; firebaseUser: User }
   | { status: "error"; firebaseUser: User | null; message: string };
-
-type MeResponse = {
-  status?: "ready" | "needs_onboarding";
-  user?: AppAccount;
-  message?: string;
-};
 
 type AuthContextValue = {
   account: AppAccount | null;
@@ -47,8 +41,6 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const apiBaseUrl = publicConfig.apiBaseUrl;
-const initialSession: AuthSessionState = { status: "checking_firebase" };
 
 export const getAuthSessionError = (session: AuthSessionState) =>
   session.status === "error" ? session.message : "";
@@ -61,100 +53,20 @@ export const isAuthSessionLoading = (session: AuthSessionState) =>
   session.status === "checking_account";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSessionState] =
-    useState<AuthSessionState>(initialSession);
-  const accountRequestIdRef = useRef(0);
-  const inFlightAccountRequestRef = useRef<{
-    firebaseUid: string;
-    promise: Promise<AccountState>;
-    requestId: number;
-  } | null>(null);
-
-  const loadAccount = useCallback(
-    async (
-      firebaseUser: User,
-      options?: {
-        forceTokenRefresh?: boolean;
-      }
-    ): Promise<AccountState> => {
-      if (
-        !options?.forceTokenRefresh &&
-        inFlightAccountRequestRef.current?.firebaseUid === firebaseUser.uid
-      ) {
-        return inFlightAccountRequestRef.current.promise;
+  const queryClient = useQueryClient();
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [isCheckingFirebase, setIsCheckingFirebase] = useState(true);
+  const accountQuery = useQuery({
+    enabled: Boolean(firebaseUser),
+    queryKey: firebaseUser ? accountQueryKey(firebaseUser.uid) : ["account"],
+    queryFn: () => {
+      if (!firebaseUser) {
+        throw new Error("Sign in to continue.");
       }
 
-      const requestId = accountRequestIdRef.current + 1;
-      accountRequestIdRef.current = requestId;
-      setSessionState({ status: "checking_account", firebaseUser });
-
-      const promise = (async () => {
-        try {
-          const idToken = await firebaseUser.getIdToken(
-            options?.forceTokenRefresh
-          );
-          const response = await fetch(`${apiBaseUrl}/me`, {
-            headers: {
-              authorization: `Bearer ${idToken}`,
-            },
-          });
-          const data = (await response.json()) as MeResponse;
-
-          if (!response.ok) {
-            throw new Error(data.message ?? "Could not load account.");
-          }
-
-          if (data.status === "needs_onboarding") {
-            if (accountRequestIdRef.current === requestId) {
-              setSessionState({ status: "needs_onboarding", firebaseUser });
-            }
-
-            return "needs_onboarding";
-          }
-
-          if (data.status !== "ready" || !data.user) {
-            throw new Error("Could not load account.");
-          }
-
-          if (accountRequestIdRef.current === requestId) {
-            setSessionState({
-              account: data.user,
-              firebaseUser,
-              status: "ready",
-            });
-          }
-
-          return "ready";
-        } catch (error) {
-          if (accountRequestIdRef.current === requestId) {
-            setSessionState({
-              firebaseUser,
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "Could not load account.",
-              status: "error",
-            });
-          }
-
-          return "unauthenticated";
-        } finally {
-          if (inFlightAccountRequestRef.current?.requestId === requestId) {
-            inFlightAccountRequestRef.current = null;
-          }
-        }
-      })();
-
-      inFlightAccountRequestRef.current = {
-        firebaseUid: firebaseUser.uid,
-        promise,
-        requestId,
-      };
-
-      return promise;
+      return fetchAccount(firebaseUser);
     },
-    []
-  );
+  });
 
   const refreshAccount = useCallback(async (options?: {
     forceTokenRefresh?: boolean;
@@ -162,32 +74,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const firebaseUser = firebaseAuth.currentUser;
 
     if (!firebaseUser) {
-      accountRequestIdRef.current += 1;
-      inFlightAccountRequestRef.current = null;
-      setSessionState({ status: "unauthenticated" });
+      queryClient.removeQueries({ queryKey: ["account"] });
       return "unauthenticated";
     }
 
-    return loadAccount(firebaseUser, options);
-  }, [loadAccount]);
+    try {
+      const account = await queryClient.fetchQuery({
+        queryKey: accountQueryKey(firebaseUser.uid),
+        queryFn: () => fetchAccount(firebaseUser, options),
+        staleTime: 0,
+      });
+
+      return account.status === "ready" ? "ready" : "needs_onboarding";
+    } catch {
+      return "unauthenticated";
+    }
+  }, [queryClient]);
 
   useEffect(() => {
     return onAuthStateChanged(firebaseAuth, (nextUser) => {
-      accountRequestIdRef.current += 1;
-      inFlightAccountRequestRef.current = null;
-
-      if (!nextUser) {
-        setSessionState({ status: "unauthenticated" });
-        return;
-      }
-
-      void loadAccount(nextUser);
+      queryClient.removeQueries({ queryKey: ["account"] });
+      queryClient.removeQueries({ queryKey: profilePostsQueryRoot });
+      queryClient.removeQueries({ queryKey: postDetailQueryRoot });
+      setFirebaseUser(nextUser);
+      setIsCheckingFirebase(false);
     });
-  }, [loadAccount]);
+  }, [queryClient]);
+
+  const session = useMemo<AuthSessionState>(() => {
+    if (isCheckingFirebase) {
+      return { status: "checking_firebase" };
+    }
+
+    if (!firebaseUser) {
+      return { status: "unauthenticated" };
+    }
+
+    if (accountQuery.isPending) {
+      return { status: "checking_account", firebaseUser };
+    }
+
+    if (accountQuery.isError) {
+      return {
+        firebaseUser,
+        message:
+          accountQuery.error instanceof Error
+            ? accountQuery.error.message
+            : "Could not load account.",
+        status: "error",
+      };
+    }
+
+    if (accountQuery.data.status === "needs_onboarding") {
+      return { status: "needs_onboarding", firebaseUser };
+    }
+
+    return {
+      account: accountQuery.data.user,
+      firebaseUser,
+      status: "ready",
+    };
+  }, [
+    accountQuery.data,
+    accountQuery.error,
+    accountQuery.isError,
+    accountQuery.isPending,
+    firebaseUser,
+    isCheckingFirebase,
+  ]);
 
   const account = session.status === "ready" ? session.account : null;
-  const firebaseUser =
-    "firebaseUser" in session ? session.firebaseUser : null;
 
   const value = useMemo(
     () => ({

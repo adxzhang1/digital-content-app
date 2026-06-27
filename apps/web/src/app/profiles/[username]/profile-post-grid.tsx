@@ -1,23 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   isAuthSessionLoading,
   isAuthSessionReady,
   useAuth,
 } from "../../auth-provider";
 import { AuthFlow } from "../../auth/auth-flow";
-import { getCurrentIdToken } from "@/lib/auth-client";
-import { publicConfig } from "@/lib/config";
 import styles from "./page.module.css";
+import {
+  fetchProfilePosts,
+  profilePostsQueryKey,
+} from "@/features/profile/profile-post-api";
 import { PostFeedViewer } from "./post-feed-viewer";
-import type { ProfilePostSummary } from "./profile-data";
+import type { ProfilePostSummary } from "@/features/profile/profile-data";
 
 type ProfilePostGridProps = {
   username: string;
 };
-
-const apiBaseUrl = publicConfig.apiBaseUrl;
 
 function PostPreview({
   post,
@@ -46,72 +47,17 @@ export function ProfilePostGrid({
   username,
 }: ProfilePostGridProps) {
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const isAccountReady = isAuthSessionReady(auth.session);
   const isAccountPending = isAuthSessionLoading(auth.session);
-  const [posts, setPosts] = useState<ProfilePostSummary[]>([]);
-  const [postsError, setPostsError] = useState("");
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
   const [viewerPostId, setViewerPostId] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (isAccountPending) {
-      return;
-    }
-
-    if (!isAccountReady) {
-      return;
-    }
-
-    let isActive = true;
-
-    async function loadPosts() {
-      setIsLoadingPosts(true);
-      setPostsError("");
-
-      try {
-        const idToken = await getCurrentIdToken();
-        const response = await fetch(`${apiBaseUrl}/profiles/${username}/posts`, {
-          headers: {
-            authorization: `Bearer ${idToken}`,
-          },
-        });
-        const data = (await response.json()) as {
-          posts?: ProfilePostSummary[];
-          message?: string;
-        };
-
-        if (!response.ok || !data.posts) {
-          throw new Error(data.message ?? "Could not load posts.");
-        }
-
-        if (!isActive) {
-          return;
-        }
-
-        setPosts(data.posts);
-        setPostsError("");
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-
-        setPostsError(
-          error instanceof Error ? error.message : "Could not load posts."
-        );
-      } finally {
-        if (isActive) {
-          setIsLoadingPosts(false);
-        }
-      }
-    }
-
-    void loadPosts();
-
-    return () => {
-      isActive = false;
-    };
-  }, [isAccountPending, isAccountReady, username]);
+  const postsQuery = useQuery({
+    enabled: isAccountReady,
+    queryKey: profilePostsQueryKey(username),
+    queryFn: () => fetchProfilePosts(username),
+  });
+  const posts = postsQuery.data ?? [];
 
   function openPost(post: ProfilePostSummary) {
     setViewerPostId(post.postId);
@@ -122,8 +68,10 @@ export function ProfilePostGrid({
   }
 
   function removePost(postId: string) {
-    setPosts((currentPosts) =>
-      currentPosts.filter((currentPost) => currentPost.postId !== postId)
+    queryClient.setQueryData<ProfilePostSummary[]>(
+      profilePostsQueryKey(username),
+      (currentPosts = []) =>
+        currentPosts.filter((currentPost) => currentPost.postId !== postId)
     );
 
     if (viewerPostId === postId) {
@@ -135,8 +83,11 @@ export function ProfilePostGrid({
     setIsAuthModalOpen(false);
   }, []);
 
-  const showPostsLoading = isAccountPending || (isAccountReady && isLoadingPosts);
+  const showPostsLoading =
+    isAccountPending || (isAccountReady && postsQuery.isPending);
   const needsAccount = !isAccountReady;
+  const postsError =
+    postsQuery.error instanceof Error ? postsQuery.error.message : "";
   const postsMessage = needsAccount ? "Subscribe" : postsError;
   return (
     <>
