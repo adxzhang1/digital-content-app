@@ -190,6 +190,10 @@ export class ApplicationStack extends cdk.Stack {
       "GetCurrentUserHandler",
       "handlers/get-current-user.ts"
     );
+    const updateCurrentProfileHandler = createHandler(
+      "UpdateCurrentProfileHandler",
+      "handlers/update-current-profile.ts"
+    );
     const createPostUploadUrlsHandler = createHandler(
       "CreatePostUploadUrlsHandler",
       "handlers/create-post-upload-urls.ts"
@@ -353,6 +357,10 @@ export class ApplicationStack extends cdk.Stack {
       "PROFILES_TABLE_NAME",
       profilesTable.tableName
     );
+    updateCurrentProfileHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
+    );
     getProfileHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
       profilesTable.tableName
@@ -390,6 +398,7 @@ export class ApplicationStack extends cdk.Stack {
       "dynamodb:TransactWriteItems"
     );
     profilesTable.grantReadData(getCurrentUserHandler);
+    profilesTable.grantWriteData(updateCurrentProfileHandler);
     profilesTable.grantReadData(getProfileHandler);
     profilesTable.grantReadData(getProfilePostsHandler);
     profilesTable.grantReadData(getPostDetailHandler);
@@ -405,6 +414,7 @@ export class ApplicationStack extends cdk.Stack {
         allowMethods: [
           CorsHttpMethod.GET,
           CorsHttpMethod.POST,
+          CorsHttpMethod.PATCH,
           CorsHttpMethod.PUT,
           CorsHttpMethod.DELETE,
           CorsHttpMethod.OPTIONS
@@ -446,6 +456,16 @@ export class ApplicationStack extends cdk.Stack {
       integration: new HttpLambdaIntegration(
         "GetCurrentUserIntegration",
         getCurrentUserHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/me/profile",
+      methods: [HttpMethod.PATCH],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "UpdateCurrentProfileIntegration",
+        updateCurrentProfileHandler
       )
     });
 

@@ -12,7 +12,7 @@ export const json = (
     "content-type": "application/json",
     "access-control-allow-origin": "*",
     "access-control-allow-headers": "content-type,authorization",
-    "access-control-allow-methods": "GET,POST,DELETE,OPTIONS"
+    "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS"
   },
   body: JSON.stringify(body)
 });
