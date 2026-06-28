@@ -163,9 +163,7 @@ export class ApplicationStack extends cdk.Stack {
       defaultBehavior: {
         allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
         cachePolicy: mediaCachePolicy,
-        origin: S3BucketOrigin.withOriginAccessControl(mediaBucket, {
-          originPath: "/posts/processed"
-        }),
+        origin: S3BucketOrigin.withOriginAccessControl(mediaBucket),
         trustedKeyGroups: [mediaKeyGroup],
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
       },
@@ -176,6 +174,13 @@ export class ApplicationStack extends cdk.Stack {
     const postProcessingQueue = new Queue(this, "PostProcessingQueue", {
       visibilityTimeout: cdk.Duration.minutes(5)
     });
+    const profilePictureProcessingQueue = new Queue(
+      this,
+      "ProfilePictureProcessingQueue",
+      {
+        visibilityTimeout: cdk.Duration.minutes(5)
+      }
+    );
 
     const healthHandler = createHandler("HealthHandler", "handlers/health.ts");
     const firebaseAuthorizerHandler = createHandler(
@@ -193,6 +198,18 @@ export class ApplicationStack extends cdk.Stack {
     const updateCurrentProfileHandler = createHandler(
       "UpdateCurrentProfileHandler",
       "handlers/update-current-profile.ts"
+    );
+    const createProfilePictureUploadHandler = createHandler(
+      "CreateProfilePictureUploadHandler",
+      "handlers/create-profile-picture-upload.ts"
+    );
+    const completeProfilePictureUploadHandler = createHandler(
+      "CompleteProfilePictureUploadHandler",
+      "handlers/complete-profile-picture-upload.ts"
+    );
+    const getProfilePictureStatusHandler = createHandler(
+      "GetProfilePictureStatusHandler",
+      "handlers/get-profile-picture-status.ts"
     );
     const createPostUploadUrlsHandler = createHandler(
       "CreatePostUploadUrlsHandler",
@@ -251,10 +268,41 @@ export class ApplicationStack extends cdk.Stack {
         }
       }
     );
+    const processProfilePictureHandler = new NodejsFunction(
+      this,
+      "ProcessProfilePictureHandler",
+      {
+        runtime: Runtime.NODEJS_22_X,
+        entry: path.join(
+          __dirname,
+          "../../packages/backend/src/handlers/process-profile-picture.ts"
+        ),
+        handler: "handler",
+        memorySize: 1024,
+        timeout: cdk.Duration.minutes(5),
+        bundling: {
+          forceDockerBundling: true,
+          minify: true,
+          sourceMap: true,
+          nodeModules: ["sharp"],
+          environment: {
+            NPM_CONFIG_STORE_DIR: "/tmp/pnpm-cache"
+          }
+        }
+      }
+    );
 
     createPostUploadUrlsHandler.addEnvironment(
       "MEDIA_BUCKET_NAME",
       mediaBucket.bucketName
+    );
+    createProfilePictureUploadHandler.addEnvironment(
+      "MEDIA_BUCKET_NAME",
+      mediaBucket.bucketName
+    );
+    createProfilePictureUploadHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
     );
     firebaseAuthorizerHandler.addEnvironment(
       "FIREBASE_PROJECT_ID",
@@ -284,6 +332,18 @@ export class ApplicationStack extends cdk.Stack {
     finalizePostHandler.addEnvironment(
       "MEDIA_SIGNING_KEY_SECRET_NAME",
       mediaSigningKeySecretName
+    );
+    completeProfilePictureUploadHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
+    );
+    completeProfilePictureUploadHandler.addEnvironment(
+      "PROFILE_PICTURE_PROCESSING_QUEUE_URL",
+      profilePictureProcessingQueue.queueUrl
+    );
+    getProfilePictureStatusHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
     );
     getPostStatusHandler.addEnvironment(
       "POSTS_TABLE_NAME",
@@ -345,6 +405,14 @@ export class ApplicationStack extends cdk.Stack {
       "MEDIA_BUCKET_NAME",
       mediaBucket.bucketName
     );
+    processProfilePictureHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
+    );
+    processProfilePictureHandler.addEnvironment(
+      "MEDIA_BUCKET_NAME",
+      mediaBucket.bucketName
+    );
     completeOnboardingHandler.addEnvironment(
       "USERS_TABLE_NAME",
       usersTable.tableName
@@ -361,22 +429,55 @@ export class ApplicationStack extends cdk.Stack {
       "PROFILES_TABLE_NAME",
       profilesTable.tableName
     );
+    updateCurrentProfileHandler.addEnvironment("MEDIA_BASE_URL", mediaBaseUrl);
+    updateCurrentProfileHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_PAIR_ID",
+      mediaPublicKey.publicKeyId
+    );
+    updateCurrentProfileHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_SECRET_NAME",
+      mediaSigningKeySecretName
+    );
     getProfileHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
       profilesTable.tableName
     );
+    getProfileHandler.addEnvironment("MEDIA_BASE_URL", mediaBaseUrl);
+    getProfileHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_PAIR_ID",
+      mediaPublicKey.publicKeyId
+    );
+    getProfileHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_SECRET_NAME",
+      mediaSigningKeySecretName
+    );
     mediaBucket.grantPut(createPostUploadUrlsHandler);
+    mediaBucket.grantPut(createProfilePictureUploadHandler);
     mediaBucket.grantDelete(deletePostHandler);
     usersTable.grantReadData(firebaseAuthorizerHandler);
     firebaseServiceAccountSecret.grantRead(firebaseAuthorizerHandler);
     mediaSigningKeySecret.grantRead(finalizePostHandler);
+    mediaSigningKeySecret.grantRead(updateCurrentProfileHandler);
+    mediaSigningKeySecret.grantRead(getProfileHandler);
     mediaSigningKeySecret.grantRead(getProfilePostsHandler);
     mediaSigningKeySecret.grantRead(getPostDetailHandler);
     mediaBucket.grantReadWrite(processPostMediaHandler);
+    mediaBucket.grantReadWrite(processProfilePictureHandler);
     postProcessingQueue.grantSendMessages(finalizePostHandler);
     postProcessingQueue.grantConsumeMessages(processPostMediaHandler);
+    profilePictureProcessingQueue.grantSendMessages(
+      completeProfilePictureUploadHandler
+    );
+    profilePictureProcessingQueue.grantConsumeMessages(
+      processProfilePictureHandler
+    );
     processPostMediaHandler.addEventSource(
       new SqsEventSource(postProcessingQueue, {
+        batchSize: 5
+      })
+    );
+    processProfilePictureHandler.addEventSource(
+      new SqsEventSource(profilePictureProcessingQueue, {
         batchSize: 5
       })
     );
@@ -399,6 +500,19 @@ export class ApplicationStack extends cdk.Stack {
     );
     profilesTable.grantReadData(getCurrentUserHandler);
     profilesTable.grantWriteData(updateCurrentProfileHandler);
+    profilesTable.grantWriteData(createProfilePictureUploadHandler);
+    profilesTable.grant(
+      createProfilePictureUploadHandler,
+      "dynamodb:ConditionCheckItem",
+      "dynamodb:TransactWriteItems"
+    );
+    profilesTable.grantWriteData(completeProfilePictureUploadHandler);
+    profilesTable.grantReadData(getProfilePictureStatusHandler);
+    profilesTable.grantReadWriteData(processProfilePictureHandler);
+    profilesTable.grant(
+      processProfilePictureHandler,
+      "dynamodb:TransactWriteItems"
+    );
     profilesTable.grantReadData(getProfileHandler);
     profilesTable.grantReadData(getProfilePostsHandler);
     profilesTable.grantReadData(getPostDetailHandler);
@@ -466,6 +580,36 @@ export class ApplicationStack extends cdk.Stack {
       integration: new HttpLambdaIntegration(
         "UpdateCurrentProfileIntegration",
         updateCurrentProfileHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/me/profile-picture",
+      methods: [HttpMethod.POST],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "CreateProfilePictureUploadIntegration",
+        createProfilePictureUploadHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/me/profile-picture/complete",
+      methods: [HttpMethod.POST],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "CompleteProfilePictureUploadIntegration",
+        completeProfilePictureUploadHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/me/profile-picture/{imageId}",
+      methods: [HttpMethod.GET],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "GetProfilePictureStatusIntegration",
+        getProfilePictureStatusHandler
       )
     });
 

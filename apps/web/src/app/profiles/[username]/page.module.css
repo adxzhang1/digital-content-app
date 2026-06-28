@@ -39,7 +39,15 @@
   border: 1px solid var(--border);
   border-radius: 50%;
   height: 154px;
+  overflow: hidden;
   width: 154px;
+}
+
+.avatar img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
 }
 
 .profileMain {

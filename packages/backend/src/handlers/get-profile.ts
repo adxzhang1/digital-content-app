@@ -4,7 +4,8 @@ import type {
 } from "aws-lambda";
 import { requireEnv } from "../lib/env.js";
 import { json } from "../lib/http.js";
-import { getProfileByUsername } from "../lib/profiles.js";
+import { getMediaSigningConfig } from "../lib/media-config.js";
+import { getProfileByUsername, toProfileResponse } from "../lib/profiles.js";
 
 const profilesTableName = requireEnv("PROFILES_TABLE_NAME");
 
@@ -30,13 +31,6 @@ export async function handler(
   }
 
   return json(200, {
-    profile: {
-      profileId: String(profile.profileId),
-      userId: String(profile.userId),
-      username: String(profile.username),
-      displayName: String(profile.displayName),
-      bio: String(profile.bio),
-      counts: profile.counts as Record<string, unknown>
-    }
+    profile: await toProfileResponse(profile, getMediaSigningConfig())
   });
 }

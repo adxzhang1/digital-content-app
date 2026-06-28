@@ -7,7 +7,7 @@ import {
   updateCurrentProfile,
   type Profile,
 } from "@/features/profile/profile-api";
-import styles from "./page.module.css";
+import styles from "../page.module.css";
 
 type EditProfileFormProps = {
   bio: string;
@@ -26,7 +26,11 @@ export function EditProfileForm({
   const [bioInput, setBioInput] = useState(bio);
   const [error, setError] = useState("");
   const updateProfileMutation = useMutation({
-    mutationFn: updateCurrentProfile,
+    mutationFn: () =>
+      updateCurrentProfile({
+        bio: bioInput,
+        displayName: displayNameInput,
+      }),
     onSuccess: (updatedProfile) => {
       setError("");
       onUpdated(updatedProfile);
@@ -41,10 +45,7 @@ export function EditProfileForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    updateProfileMutation.mutate({
-      bio: bioInput,
-      displayName: displayNameInput,
-    });
+    updateProfileMutation.mutate();
   }
 
   return (

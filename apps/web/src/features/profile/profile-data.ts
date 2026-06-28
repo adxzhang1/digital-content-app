@@ -1,9 +1,18 @@
+export type ProfilePicture = {
+  imageId: string;
+  processedKey?: string;
+  url?: string;
+  width: number;
+  height: number;
+};
+
 export type Profile = {
   profileId: string;
   userId: string;
   username: string;
   displayName: string;
   bio: string;
+  image?: ProfilePicture;
   counts: {
     posts: number;
     likes: string;

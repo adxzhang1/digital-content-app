@@ -2,6 +2,7 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2
 } from "aws-lambda";
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { z } from "zod";
 import {
@@ -11,14 +12,15 @@ import {
 import { documentClient } from "../lib/dynamodb.js";
 import { requireEnv } from "../lib/env.js";
 import { json, parseJsonBody } from "../lib/http.js";
-import { getMediaSigningConfig } from "../lib/media-config.js";
-import { toProfileResponse } from "../lib/profiles.js";
+import { sqsClient } from "../lib/sqs.js";
 
 const profilesTableName = requireEnv("PROFILES_TABLE_NAME");
+const profilePictureProcessingQueueUrl = requireEnv(
+  "PROFILE_PICTURE_PROCESSING_QUEUE_URL"
+);
 
-const updateProfileSchema = z.object({
-  displayName: z.string().trim().min(1, "Display name is required.").max(80),
-  bio: z.string().trim().max(160)
+const completeProfilePictureSchema = z.object({
+  imageId: z.string().trim().min(1, "Image id is required.")
 });
 
 export async function handler(
@@ -49,62 +51,77 @@ export async function handler(
     });
   }
 
-  const parsedBody = updateProfileSchema.safeParse(body);
+  const parsedBody = completeProfilePictureSchema.safeParse(body);
 
   if (!parsedBody.success) {
     return json(400, {
-      code: "INVALID_PROFILE",
-      message: parsedBody.error.issues[0]?.message ?? "Invalid profile payload."
+      code: "INVALID_PROFILE_PICTURE",
+      message:
+        parsedBody.error.issues[0]?.message ?? "Invalid profile picture payload."
     });
   }
 
-  const { displayName, bio } = parsedBody.data;
+  const { imageId } = parsedBody.data;
   const updatedAt = new Date().toISOString();
-  let result;
+  let profilePicture;
 
   try {
-    result = await documentClient.send(
+    const result = await documentClient.send(
       new UpdateCommand({
         TableName: profilesTableName,
         Key: {
-          PK: `PROFILE#${authenticatedUser.profileId}`,
+          PK: `PROFILE_IMAGE#${imageId}`,
           SK: "METADATA"
         },
-        ConditionExpression: "attribute_exists(PK)",
-        UpdateExpression:
-          "SET displayName = :displayName, bio = :bio, updatedAt = :updatedAt",
+        ConditionExpression:
+          "profileId = :profileId AND #status = :uploading",
+        UpdateExpression: "SET #status = :processing, updatedAt = :updatedAt",
+        ExpressionAttributeNames: {
+          "#status": "status"
+        },
         ExpressionAttributeValues: {
-          ":displayName": displayName,
-          ":bio": bio,
+          ":profileId": authenticatedUser.profileId,
+          ":uploading": "UPLOADING",
+          ":processing": "PROCESSING",
           ":updatedAt": updatedAt
         },
         ReturnValues: "ALL_NEW"
       })
     );
+
+    profilePicture = result.Attributes;
   } catch (error) {
     if (
       error instanceof Error &&
       error.name === "ConditionalCheckFailedException"
     ) {
       return json(404, {
-        code: "PROFILE_NOT_FOUND",
-        message: "Profile not found."
+        code: "PROFILE_PICTURE_NOT_FOUND",
+        message: "Profile picture not found."
       });
     }
 
     throw error;
   }
 
-  const profile = result.Attributes;
-
-  if (!profile) {
+  if (!profilePicture) {
     return json(404, {
-      code: "PROFILE_NOT_FOUND",
-      message: "Profile not found."
+      code: "PROFILE_PICTURE_NOT_FOUND",
+      message: "Profile picture not found."
     });
   }
 
-  return json(200, {
-    profile: await toProfileResponse(profile, getMediaSigningConfig())
+  await sqsClient.send(
+    new SendMessageCommand({
+      QueueUrl: profilePictureProcessingQueueUrl,
+      MessageBody: JSON.stringify({
+        profileId: authenticatedUser.profileId,
+        imageId
+      })
+    })
+  );
+
+  return json(202, {
+    profilePicture
   });
 }

@@ -27,7 +27,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       <div className={styles.content}>
         <section className={styles.profile} aria-label="Profile">
           <div className={styles.avatarColumn}>
-            <div className={styles.avatar} aria-hidden="true" />
+            <div className={styles.avatar} aria-hidden={!profile.image?.url}>
+              {profile.image?.url ? <img alt="" src={profile.image.url} /> : null}
+            </div>
           </div>
 
           <div className={styles.profileMain}>

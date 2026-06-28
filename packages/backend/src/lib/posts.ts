@@ -5,8 +5,6 @@ type RawPost = Record<string, unknown>;
 
 type RawMedia = Record<string, unknown>;
 
-const processedMediaPrefix = "posts/processed/";
-
 const getProcessedMediaUrl = (
   signingConfig: Pick<MediaSigningConfig, "baseUrl">,
   processedKey: unknown
@@ -15,10 +13,7 @@ const getProcessedMediaUrl = (
     return undefined;
   }
 
-  const mediaPath = processedKey.startsWith(processedMediaPrefix)
-    ? processedKey.slice(processedMediaPrefix.length)
-    : processedKey;
-  const encodedPath = mediaPath.split("/").map(encodeURIComponent).join("/");
+  const encodedPath = processedKey.split("/").map(encodeURIComponent).join("/");
 
   return `${signingConfig.baseUrl.replace(/\/$/, "")}/${encodedPath}`;
 };

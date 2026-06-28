@@ -16,7 +16,8 @@ import {
 } from "@/features/profile/profile-api";
 import { AccountSettings } from "./account-settings";
 import { CreatePostForm } from "./create-post-form";
-import { EditProfileForm } from "./edit-profile-form";
+import { EditProfileForm } from "./profile-editor/edit-profile-form";
+import { EditProfilePicture } from "./profile-editor/edit-profile-picture";
 import styles from "./page.module.css";
 
 export function CreatorDashboard() {
@@ -28,6 +29,8 @@ export function CreatorDashboard() {
   const username = auth.account?.username;
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isEditProfilePictureOpen, setIsEditProfilePictureOpen] =
+    useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const profileQuery = useQuery({
     enabled: Boolean(isAccountReady && username),
@@ -59,11 +62,16 @@ export function CreatorDashboard() {
 
   const displayName = activeProfile?.displayName ?? auth.account.displayName;
   const bio = activeProfile?.bio ?? "";
+  const imageUrl = activeProfile?.image?.url;
   const postCount = activeProfile?.counts.posts ?? 0;
   const likeCount = activeProfile?.counts.likes ?? "0";
 
   function handleEditProfileOpen() {
     setIsEditProfileOpen(true);
+  }
+
+  function handleEditProfilePictureOpen() {
+    setIsEditProfilePictureOpen(true);
   }
 
   function handleProfileUpdated(updatedProfile: Profile) {
@@ -72,13 +80,23 @@ export function CreatorDashboard() {
       updatedProfile
     );
     setIsEditProfileOpen(false);
+    setIsEditProfilePictureOpen(false);
   }
 
   return (
     <div className={styles.dashboard}>
       <section className={styles.profileHeader} aria-label="Your profile">
         <div className={styles.avatarColumn}>
-          <div className={styles.avatar} aria-hidden="true" />
+          <div className={styles.avatar}>
+            {imageUrl ? <img alt="" src={imageUrl} /> : null}
+            <button
+              className={styles.editAvatarButton}
+              onClick={handleEditProfilePictureOpen}
+              type="button"
+            >
+              Edit photo
+            </button>
+          </div>
         </div>
 
         <div className={styles.profileMain}>
@@ -171,6 +189,14 @@ export function CreatorDashboard() {
           displayName={displayName}
           onClose={() => setIsEditProfileOpen(false)}
           onUpdated={handleProfileUpdated}
+        />
+      ) : null}
+
+      {isEditProfilePictureOpen ? (
+        <EditProfilePicture
+          onClose={() => setIsEditProfilePictureOpen(false)}
+          onUpdated={handleProfileUpdated}
+          username={auth.account.username}
         />
       ) : null}
 
