@@ -37,30 +37,31 @@ export function ScrollSnapFeed<TItem extends ScrollSnapFeedItem>({
 }: ScrollSnapFeedProps<TItem>) {
   const feedRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
-  const hasInitializedScrollPositionRef = useRef(false);
+  const feedHeightRef = useRef(0);
   const initialItemIndex = Math.max(
     0,
     items.findIndex((item) => item.id === activeItemId)
   );
+  const clampedActiveIndexRef = useRef(initialItemIndex);
   const [activeIndex, setActiveIndex] = useState(initialItemIndex);
   const [feedHeight, setFeedHeight] = useState(0);
-  const visibleIndex = clampIndex(activeIndex, items.length);
+  const clampedActiveIndex = clampIndex(activeIndex, items.length);
   const contentHeight =
     feedHeight > 0 ? `${items.length * feedHeight}px` : "100dvh";
   const virtualItems = useMemo(() => {
     const startIndex =
       feedHeight > 0
-        ? clampIndex(visibleIndex - VIRTUAL_WINDOW_RADIUS, items.length)
-        : visibleIndex;
+        ? clampIndex(clampedActiveIndex - VIRTUAL_WINDOW_RADIUS, items.length)
+        : clampedActiveIndex;
     const endIndex =
       feedHeight > 0
-        ? clampIndex(visibleIndex + VIRTUAL_WINDOW_RADIUS, items.length)
-        : visibleIndex;
+        ? clampIndex(clampedActiveIndex + VIRTUAL_WINDOW_RADIUS, items.length)
+        : clampedActiveIndex;
 
     return items
       .slice(startIndex, endIndex + 1)
       .map((item, offset) => ({ index: startIndex + offset, item }));
-  }, [feedHeight, items, visibleIndex]);
+  }, [clampedActiveIndex, feedHeight, items]);
   const snapItems = useMemo(
     () =>
       items.map((item) => (
@@ -85,6 +86,7 @@ export function ScrollSnapFeed<TItem extends ScrollSnapFeedItem>({
         return;
       }
 
+      clampedActiveIndexRef.current = nextIndex;
       setActiveIndex((currentIndex) =>
         currentIndex === nextIndex ? currentIndex : nextIndex
       );
@@ -103,10 +105,18 @@ export function ScrollSnapFeed<TItem extends ScrollSnapFeedItem>({
       return;
     }
 
+    if (Math.abs(feed.getBoundingClientRect().height - feedHeight) > 0.5) {
+      return;
+    }
+
     setActiveItemIndex(Math.round(feed.scrollTop / feedHeight));
   }, [feedHeight, setActiveItemIndex]);
 
   useEffect(() => {
+    clampedActiveIndexRef.current = clampedActiveIndex;
+  }, [clampedActiveIndex]);
+
+  useLayoutEffect(() => {
     const feed = feedRef.current;
 
     if (!feed) {
@@ -115,41 +125,31 @@ export function ScrollSnapFeed<TItem extends ScrollSnapFeedItem>({
 
     const updateFeedHeight = () => {
       const nextFeedHeight = feed.getBoundingClientRect().height;
-      setFeedHeight((currentHeight) =>
-        currentHeight === nextFeedHeight ? currentHeight : nextFeedHeight
-      );
+
+      if (feedHeightRef.current === nextFeedHeight) {
+        return;
+      }
+
+      feedHeightRef.current = nextFeedHeight;
+      clearScrollFrame();
+      feed.scrollTop = clampedActiveIndexRef.current * nextFeedHeight;
+      setFeedHeight(nextFeedHeight);
     };
     const resizeObserver = new ResizeObserver(updateFeedHeight);
-    const frameId = window.requestAnimationFrame(updateFeedHeight);
 
+    updateFeedHeight();
     resizeObserver.observe(feed);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [clearScrollFrame]);
 
   useEffect(() => {
     return () => {
       clearScrollFrame();
     };
   }, [clearScrollFrame]);
-
-  useLayoutEffect(() => {
-    const feed = feedRef.current;
-
-    if (
-      !feed ||
-      feedHeight <= 0 ||
-      hasInitializedScrollPositionRef.current
-    ) {
-      return;
-    }
-
-    hasInitializedScrollPositionRef.current = true;
-    feed.scrollTop = initialItemIndex * feedHeight;
-  }, [feedHeight, initialItemIndex]);
 
   function handleScroll() {
     clearScrollFrame();
@@ -176,7 +176,7 @@ export function ScrollSnapFeed<TItem extends ScrollSnapFeedItem>({
 
           return (
             <div className={styles.item} key={item.id} style={itemStyle}>
-              {renderItem(item, { isActive: index === visibleIndex })}
+              {renderItem(item, { isActive: index === clampedActiveIndex })}
             </div>
           );
         })}

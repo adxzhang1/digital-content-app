@@ -34,23 +34,23 @@ export function ScrollSnapCarousel<TItem extends ScrollSnapCarouselItem>({
   const measuredCarouselWidthRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const [carouselWidth, setCarouselWidth] = useState(0);
-  const visibleIndex = clampIndex(activeIndex, items.length);
+  const clampedActiveIndex = clampIndex(activeIndex, items.length);
   const contentWidth =
     carouselWidth > 0 ? `${items.length * carouselWidth}px` : "100%";
   const virtualItems = useMemo(() => {
     const startIndex =
       carouselWidth > 0
-        ? clampIndex(visibleIndex - VIRTUAL_WINDOW_RADIUS, items.length)
-        : visibleIndex;
+        ? clampIndex(clampedActiveIndex - VIRTUAL_WINDOW_RADIUS, items.length)
+        : clampedActiveIndex;
     const endIndex =
       carouselWidth > 0
-        ? clampIndex(visibleIndex + VIRTUAL_WINDOW_RADIUS, items.length)
-        : visibleIndex;
+        ? clampIndex(clampedActiveIndex + VIRTUAL_WINDOW_RADIUS, items.length)
+        : clampedActiveIndex;
 
     return items
       .slice(startIndex, endIndex + 1)
       .map((item, offset) => ({ index: startIndex + offset, item }));
-  }, [carouselWidth, items, visibleIndex]);
+  }, [carouselWidth, clampedActiveIndex, items]);
   const snapItems = useMemo(
     () =>
       items.map((item) => {
@@ -131,8 +131,8 @@ export function ScrollSnapCarousel<TItem extends ScrollSnapCarouselItem>({
     }
 
     measuredCarouselWidthRef.current = carouselWidth;
-    carousel.scrollLeft = visibleIndex * carouselWidth;
-  }, [carouselWidth, visibleIndex]);
+    carousel.scrollLeft = clampedActiveIndex * carouselWidth;
+  }, [carouselWidth, clampedActiveIndex]);
 
   function handleScroll() {
     clearScrollFrame();
@@ -172,7 +172,7 @@ export function ScrollSnapCarousel<TItem extends ScrollSnapCarouselItem>({
               left: carouselWidth > 0 ? `${index * carouselWidth}px` : "0",
               width: carouselWidth > 0 ? `${carouselWidth}px` : "100%",
             } satisfies CSSProperties;
-            const isPriority = Math.abs(index - visibleIndex) <= 1;
+            const isPriority = Math.abs(index - clampedActiveIndex) <= 1;
 
             return (
               <div className={styles.item} key={item.id} style={slideStyle}>
@@ -187,8 +187,8 @@ export function ScrollSnapCarousel<TItem extends ScrollSnapCarouselItem>({
           <button
             aria-label="Previous item"
             className={`${styles.button} ${styles.previous}`}
-            disabled={visibleIndex === 0}
-            onClick={() => scrollToIndex(visibleIndex - 1)}
+            disabled={clampedActiveIndex === 0}
+            onClick={() => scrollToIndex(clampedActiveIndex - 1)}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -198,8 +198,8 @@ export function ScrollSnapCarousel<TItem extends ScrollSnapCarouselItem>({
           <button
             aria-label="Next item"
             className={`${styles.button} ${styles.next}`}
-            disabled={visibleIndex === items.length - 1}
-            onClick={() => scrollToIndex(visibleIndex + 1)}
+            disabled={clampedActiveIndex === items.length - 1}
+            onClick={() => scrollToIndex(clampedActiveIndex + 1)}
             type="button"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -210,7 +210,7 @@ export function ScrollSnapCarousel<TItem extends ScrollSnapCarouselItem>({
             {items.map((item, index) => (
               <span
                 className={
-                  index === visibleIndex ? styles.dotActive : undefined
+                  index === clampedActiveIndex ? styles.dotActive : undefined
                 }
                 key={item.id}
               />
