@@ -107,19 +107,13 @@ const MediaItem = memo(function MediaItem({
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      setVideoState({
-        control: "pause",
-        controlVisible: false,
-        isReady: false,
-        shouldMount: true,
-        url: activeVideoUrl,
-      });
-    }, 2000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    setVideoState({
+      control: "pause",
+      controlVisible: false,
+      isReady: false,
+      shouldMount: true,
+      url: activeVideoUrl,
+    });
   }, [activeVideoUrl]);
 
   useEffect(() => {
