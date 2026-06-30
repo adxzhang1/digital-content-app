@@ -2,7 +2,8 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2
 } from "aws-lambda";
-import { DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { CancelJobCommand } from "@aws-sdk/client-mediaconvert";
+import { DeleteObjectsCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { DeleteCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import {
   authErrorResponse,
@@ -12,6 +13,7 @@ import {
 import { documentClient } from "../lib/dynamodb.js";
 import { requireEnv } from "../lib/env.js";
 import { json } from "../lib/http.js";
+import { mediaConvertClient } from "../lib/mediaconvert.js";
 import { getProfileByUsername } from "../lib/profiles.js";
 import { s3Client } from "../lib/s3.js";
 
@@ -20,8 +22,11 @@ const profilesTableName = requireEnv("PROFILES_TABLE_NAME");
 const mediaBucketName = requireEnv("MEDIA_BUCKET_NAME");
 
 type PostMedia = {
+  hlsPrefix?: unknown;
   originalKey?: unknown;
+  playlistKey?: unknown;
   processedKey?: unknown;
+  thumbnailKey?: unknown;
 };
 
 type DeleteMode = "soft" | "force";
@@ -34,8 +39,30 @@ const getPostMediaKeys = (media: unknown) => {
   return [
     ...new Set(
       (media as PostMedia[])
-        .flatMap((item) => [item.originalKey, item.processedKey])
+        .flatMap((item) => [
+          item.originalKey,
+          item.processedKey,
+          item.playlistKey,
+          item.thumbnailKey,
+        ])
         .filter((key): key is string => typeof key === "string" && key.length > 0)
+    )
+  ];
+};
+
+const getPostMediaPrefixes = (media: unknown) => {
+  if (!Array.isArray(media)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      (media as PostMedia[])
+        .map((item) => item.hlsPrefix)
+        .filter(
+          (prefix): prefix is string =>
+            typeof prefix === "string" && prefix.length > 0
+        )
     )
   ];
 };
@@ -47,9 +74,32 @@ const getDeleteMode = (event: APIGatewayProxyEventV2): DeleteMode =>
     : "soft";
 
 async function deleteMediaObjects(media: unknown) {
-  const mediaKeys = getPostMediaKeys(media);
+  const mediaKeys = new Set(getPostMediaKeys(media));
+  const prefixes = getPostMediaPrefixes(media);
 
-  if (mediaKeys.length === 0) {
+  for (const prefix of prefixes) {
+    let continuationToken: string | undefined;
+
+    do {
+      const result = await s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: mediaBucketName,
+          ContinuationToken: continuationToken,
+          Prefix: prefix
+        })
+      );
+
+      result.Contents?.forEach((object) => {
+        if (object.Key) {
+          mediaKeys.add(object.Key);
+        }
+      });
+
+      continuationToken = result.NextContinuationToken;
+    } while (continuationToken);
+  }
+
+  if (mediaKeys.size === 0) {
     return;
   }
 
@@ -57,7 +107,7 @@ async function deleteMediaObjects(media: unknown) {
     new DeleteObjectsCommand({
       Bucket: mediaBucketName,
       Delete: {
-        Objects: mediaKeys.map((key) => ({
+        Objects: [...mediaKeys].map((key) => ({
           Key: key
         })),
         Quiet: true
@@ -66,7 +116,34 @@ async function deleteMediaObjects(media: unknown) {
   );
 }
 
-async function forceDeletePost(postId: string, profileId: string, media: unknown) {
+async function cancelMediaConvertJob(jobId: unknown) {
+  if (typeof jobId !== "string" || jobId.length === 0) {
+    return;
+  }
+
+  try {
+    await mediaConvertClient.send(
+      new CancelJobCommand({
+        Id: jobId
+      })
+    );
+  } catch {
+    // The job may already be complete; force delete should still remove records.
+  }
+}
+
+async function forceDeletePost({
+  media,
+  mediaConvertJobId,
+  postId,
+  profileId
+}: {
+  media: unknown;
+  mediaConvertJobId: unknown;
+  postId: string;
+  profileId: string;
+}) {
+  await cancelMediaConvertJob(mediaConvertJobId);
   await deleteMediaObjects(media);
 
   await documentClient.send(
@@ -185,7 +262,12 @@ export async function handler(
     const deleteMode = getDeleteMode(event);
 
     if (deleteMode === "force") {
-      await forceDeletePost(postId, profileId, post.media);
+      await forceDeletePost({
+        media: post.media,
+        mediaConvertJobId: post.mediaConvertJobId,
+        postId,
+        profileId
+      });
     } else {
       await softDeletePost(postId, profileId);
     }

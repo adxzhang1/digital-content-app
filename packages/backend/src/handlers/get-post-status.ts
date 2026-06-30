@@ -61,7 +61,6 @@ export async function handler(
       postId: result.Item.postId,
       profileId: result.Item.profileId,
       status: result.Item.status,
-      media: result.Item.media ?? [],
       createdAt: result.Item.createdAt,
       updatedAt: result.Item.updatedAt
     }

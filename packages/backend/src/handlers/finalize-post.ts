@@ -20,7 +20,7 @@ import { toPostResponse } from "../lib/posts.js";
 const postsTableName = requireEnv("POSTS_TABLE_NAME");
 const postProcessingQueueUrl = requireEnv("POST_PROCESSING_QUEUE_URL");
 
-const mediaSchema = z.object({
+const imageMediaSchema = z.object({
   mediaId: z.string().trim().min(1, "Media id is required."),
   position: z.number().int().min(0).max(9),
   type: z.literal("IMAGE"),
@@ -28,12 +28,76 @@ const mediaSchema = z.object({
   contentType: z.enum(["image/jpeg", "image/png", "image/webp"])
 });
 
-const finalizePostSchema = z.object({
-  postId: z.string().trim().min(1, "Post id is required."),
-  profileId: z.string().trim().min(1, "Profile id is required."),
-  caption: z.string().trim().max(2200).default(""),
-  media: z.array(mediaSchema).min(1).max(10)
+const videoMediaSchema = z.object({
+  mediaId: z.string().trim().min(1, "Media id is required."),
+  position: z.literal(0),
+  type: z.literal("VIDEO"),
+  originalKey: z.string().trim().min(1, "Original key is required."),
+  contentType: z.enum(["video/mp4", "video/quicktime", "video/webm"])
 });
+
+const mediaSchema = z.union([imageMediaSchema, videoMediaSchema]);
+
+const extensionByContentType = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm"
+} as const;
+
+const getExpectedOriginalKey = ({
+  mediaId,
+  position,
+  postId,
+  profileId,
+  contentType
+}: {
+  mediaId: string;
+  position: number;
+  postId: string;
+  profileId: string;
+  contentType: keyof typeof extensionByContentType;
+}) =>
+  `posts/original/${profileId}/${postId}/${position}-${mediaId}.${
+    extensionByContentType[contentType]
+  }`;
+
+const finalizePostSchema = z
+  .object({
+    postId: z.string().trim().min(1, "Post id is required."),
+    profileId: z.string().trim().min(1, "Profile id is required."),
+    caption: z.string().trim().max(2200).default(""),
+    media: z.array(mediaSchema).min(1).max(10)
+  })
+  .superRefine((value, context) => {
+    const hasVideo = value.media.some((item) => item.type === "VIDEO");
+
+    if (hasVideo && value.media.length !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "A video must be the only media item in a post."
+      });
+    }
+
+    value.media.forEach((item, index) => {
+      const expectedOriginalKey = getExpectedOriginalKey({
+        contentType: item.contentType,
+        mediaId: item.mediaId,
+        position: item.position,
+        postId: value.postId,
+        profileId: value.profileId
+      });
+
+      if (item.position !== index || item.originalKey !== expectedOriginalKey) {
+        context.addIssue({
+          code: "custom",
+          message: "Invalid media item."
+        });
+      }
+    });
+  });
 
 export async function handler(
   event: APIGatewayProxyEventV2

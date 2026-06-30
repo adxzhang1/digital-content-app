@@ -60,3 +60,35 @@ export const getSignedCloudFrontUrl = async (
     dateLessThan: new Date(Date.now() + config.expiresInSeconds * 1000)
   });
 };
+
+export const getSignedCloudFrontUrlWithPolicy = async ({
+  config,
+  resourceUrl,
+  url
+}: {
+  config: MediaSigningConfig;
+  resourceUrl: string;
+  url: string;
+}) => {
+  const privateKey = await getPrivateKey(config.keySecretName);
+  const expiresAt = Math.floor(Date.now() / 1000) + config.expiresInSeconds;
+  const policy = JSON.stringify({
+    Statement: [
+      {
+        Resource: resourceUrl,
+        Condition: {
+          DateLessThan: {
+            "AWS:EpochTime": expiresAt
+          }
+        }
+      }
+    ]
+  });
+
+  return getSignedUrl({
+    url,
+    keyPairId: config.keyPairId,
+    privateKey,
+    policy
+  });
+};

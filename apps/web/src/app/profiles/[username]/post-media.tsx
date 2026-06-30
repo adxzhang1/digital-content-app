@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import Hls from "hls.js";
 import { ScrollSnapCarousel } from "@/features/feed/scroll-snap-carousel";
 import styles from "./post-feed-viewer.module.css";
 import type {
@@ -8,6 +16,12 @@ import type {
 
 type FeedMediaItem = {
   id: string;
+  sources?: {
+    hls?: {
+      url?: string;
+    };
+  };
+  type: string;
   url?: string;
 };
 
@@ -26,7 +40,7 @@ const getPostMediaItems = (
     const thumbnail = summaryPost.thumbnail;
 
     return [...resolvedPost.media]
-      .filter((item) => item.url)
+      .filter((item) => item.url || item.sources?.hls?.url)
       .sort((left, right) => left.position - right.position)
       .map((item) => {
         const matchesThumbnail =
@@ -41,45 +55,252 @@ const getPostMediaItems = (
   return summaryPost.thumbnail?.url ? [summaryPost.thumbnail] : [];
 };
 
-function MediaItem({
+const MediaItem = memo(function MediaItem({
+  isActive,
   isImageCover,
   preload,
+  sources,
+  type,
   url,
 }: {
+  isActive: boolean;
   isImageCover: boolean;
   preload: boolean;
+  sources?: FeedMediaItem["sources"];
+  type: string;
   url?: string;
 }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const displayUrl = url;
+  const activeVideoUrl =
+    type === "VIDEO" && isActive ? sources?.hls?.url : undefined;
+  const [videoState, setVideoState] = useState<{
+    control: "pause" | "play";
+    controlVisible: boolean;
+    isReady: boolean;
+    shouldMount: boolean;
+    url?: string;
+  }>({
+    control: "pause",
+    controlVisible: false,
+    isReady: false,
+    shouldMount: false,
+  });
+  const isCurrentVideo = Boolean(
+    activeVideoUrl && videoState.url === activeVideoUrl
+  );
+  const shouldMountVideo = isCurrentVideo && videoState.shouldMount;
+  const isVideoReady = isCurrentVideo && videoState.isReady;
+
   useEffect(() => {
-    if (!preload || !url) {
+    if (!preload || !displayUrl) {
       return;
     }
 
     const image = new Image();
-    image.src = url;
+    image.src = displayUrl;
     void image.decode().catch(() => {});
-  }, [preload, url]);
+  }, [displayUrl, preload]);
 
-  if (!url) {
+  useEffect(() => {
+    if (!activeVideoUrl) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVideoState({
+        control: "pause",
+        controlVisible: false,
+        isReady: false,
+        shouldMount: true,
+        url: activeVideoUrl,
+      });
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [activeVideoUrl]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const videoUrl = activeVideoUrl;
+
+    if (!shouldMountVideo || !video || !videoUrl) {
+      return;
+    }
+
+    let hls: Hls | undefined;
+    const markVideoReady = () => {
+      const revealVideo = () => {
+        window.requestAnimationFrame(() => {
+          setVideoState((currentState) =>
+            currentState.url === videoUrl
+              ? {
+                  ...currentState,
+                  isReady: true,
+                }
+              : currentState
+          );
+        });
+      };
+
+      if ("requestVideoFrameCallback" in video) {
+        video.requestVideoFrameCallback(revealVideo);
+        return;
+      }
+
+      revealVideo();
+    };
+    const playVideo = () => {
+      void video.play().catch(() => {});
+    };
+    const loadVideo = () => {
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.addEventListener("playing", markVideoReady, { once: true });
+        video.addEventListener("loadedmetadata", playVideo, { once: true });
+        video.src = videoUrl;
+        return;
+      }
+
+      if (!Hls.isSupported()) {
+        return;
+      }
+
+      hls = new Hls();
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        hls?.loadSource(videoUrl);
+      });
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        playVideo();
+      });
+      video.addEventListener("playing", markVideoReady, { once: true });
+      hls.attachMedia(video);
+    };
+
+    loadVideo();
+
+    return () => {
+      hls?.destroy();
+      video.removeEventListener("playing", markVideoReady);
+      video.removeEventListener("loadedmetadata", playVideo);
+      video.removeAttribute("src");
+    };
+  }, [activeVideoUrl, shouldMountVideo]);
+
+  useEffect(() => {
+    if (!videoState.controlVisible) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVideoState((currentState) => ({
+        ...currentState,
+        controlVisible: false,
+      }));
+    }, 650);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [videoState.controlVisible, videoState.control]);
+
+  function toggleVideoPlayback() {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    if (video.paused) {
+      void video.play().catch(() => {});
+      setVideoState((currentState) => ({
+        ...currentState,
+        control: "play",
+        controlVisible: true,
+      }));
+      return;
+    }
+
+    video.pause();
+    setVideoState((currentState) => ({
+      ...currentState,
+      control: "pause",
+      controlVisible: true,
+    }));
+  }
+
+  if (!displayUrl) {
     return null;
+  }
+
+  const mediaClassName = isImageCover
+    ? `${styles.modalImage} ${styles.modalImageCover}`
+    : styles.modalImage;
+
+  if (type === "VIDEO") {
+    return (
+      <>
+        <img
+          alt=""
+          className={`${mediaClassName} ${
+            isVideoReady ? styles.videoImageHidden : ""
+          }`}
+          decoding="async"
+          draggable={false}
+          fetchPriority={preload ? "high" : "auto"}
+          loading={preload ? "eager" : "lazy"}
+          src={displayUrl}
+        />
+        {shouldMountVideo && sources?.hls?.url ? (
+          <>
+            <video
+              autoPlay
+              className={`${mediaClassName} ${
+                isVideoReady ? "" : styles.videoLoading
+              }`}
+              playsInline
+              preload="metadata"
+              ref={videoRef}
+            />
+            <button
+              aria-label="Play or pause video"
+              className={styles.videoOverlay}
+              onClick={toggleVideoPlayback}
+              type="button"
+            >
+              <span
+                className={`${styles.videoControlIcon} ${
+                  videoState.controlVisible ? styles.videoControlIconVisible : ""
+                }`}
+              >
+                <span
+                  className={
+                    videoState.control === "play"
+                      ? styles.videoPlayIcon
+                      : styles.videoPauseIcon
+                  }
+                />
+              </span>
+            </button>
+          </>
+        ) : null}
+      </>
+    );
   }
 
   return (
     <img
       alt=""
-      className={
-        isImageCover
-          ? `${styles.modalImage} ${styles.modalImageCover}`
-          : styles.modalImage
-      }
+      className={mediaClassName}
       decoding="async"
       draggable={false}
       fetchPriority={preload ? "high" : "auto"}
       loading={preload ? "eager" : "lazy"}
-      src={url}
+      src={displayUrl}
     />
   );
-}
+});
 
 export function PostMedia({
   isActive,
@@ -91,6 +312,8 @@ export function PostMedia({
     () =>
       getPostMediaItems(post, resolvedPost).map((item) => ({
         id: item.mediaId,
+        sources: item.sources,
+        type: item.type,
         url: item.url,
       })),
     [post, resolvedPost]
@@ -102,8 +325,11 @@ export function PostMedia({
   const renderCarouselItem = useCallback(
     (item: FeedMediaItem, { isPriority }: { isPriority: boolean }) => (
       <MediaItem
+        isActive={isActive}
         isImageCover={isImageCover}
         preload={isActive && isPriority}
+        sources={item.sources}
+        type={item.type}
         url={item.url}
       />
     ),
@@ -117,8 +343,11 @@ export function PostMedia({
   if (singleMediaItem) {
     return (
       <MediaItem
+        isActive={isActive}
         isImageCover={isImageCover}
         preload={isActive}
+        sources={singleMediaItem.sources}
+        type={singleMediaItem.type}
         url={singleMediaItem.url}
       />
     );

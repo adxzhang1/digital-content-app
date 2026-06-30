@@ -1,11 +1,54 @@
-import { getSignedCloudFrontUrl } from "./media-signer.js";
+import {
+  getSignedCloudFrontUrl,
+  getSignedCloudFrontUrlWithPolicy
+} from "./media-signer.js";
 import type { MediaSigningConfig } from "./media-signer.js";
 
 type RawPost = Record<string, unknown>;
 
 type RawMedia = Record<string, unknown>;
 
-const getProcessedMediaUrl = (
+const toRenditionResponse = (rendition: unknown) => {
+  if (!rendition || typeof rendition !== "object") {
+    return undefined;
+  }
+
+  const item = rendition as Record<string, unknown>;
+  const width = Number(item.Width ?? item.width ?? 0);
+  const height = Number(item.Height ?? item.height ?? 0);
+  const response = {
+    ...(width > 0 ? { width } : {}),
+    ...(height > 0 ? { height } : {})
+  };
+
+  return Object.keys(response).length > 0 ? response : undefined;
+};
+
+const toRenditionsResponse = (renditions: unknown) => {
+  if (!renditions || typeof renditions !== "object") {
+    return undefined;
+  }
+
+  const response = Object.fromEntries(
+    Object.entries(renditions as Record<string, unknown>)
+      .map(([name, rendition]) => [name, toRenditionResponse(rendition)])
+      .filter((entry): entry is [string, { width?: number; height?: number }] =>
+        Boolean(entry[1])
+      )
+  );
+
+  return Object.keys(response).length > 0 ? response : undefined;
+};
+
+const getSignedUrlResponse = async (
+  signingConfig: MediaSigningConfig,
+  key: unknown
+) =>
+  typeof key === "string" && key.length > 0
+    ? await getSignedProcessedMediaUrl(signingConfig, key)
+    : undefined;
+
+export const getProcessedMediaUrl = (
   signingConfig: Pick<MediaSigningConfig, "baseUrl">,
   processedKey: unknown
 ) => {
@@ -31,6 +74,24 @@ export const getSignedProcessedMediaUrl = async (
   return getSignedCloudFrontUrl(url, signingConfig);
 };
 
+const getSignedHlsManifestUrl = async (
+  signingConfig: MediaSigningConfig,
+  playlistKey: string,
+  hlsPrefix: string
+) => {
+  const playlistUrl = getProcessedMediaUrl(signingConfig, playlistKey);
+
+  if (!playlistUrl) {
+    return undefined;
+  }
+
+  return getSignedCloudFrontUrlWithPolicy({
+    config: signingConfig,
+    resourceUrl: `${signingConfig.baseUrl.replace(/\/$/, "")}/${hlsPrefix}/*.m3u8`,
+    url: playlistUrl
+  });
+};
+
 const toMediaResponse = async (
   media: unknown,
   signingConfig: MediaSigningConfig
@@ -40,16 +101,46 @@ const toMediaResponse = async (
   }
 
   return Promise.all(
-    (media as RawMedia[]).map(async (item) => ({
-      mediaId: String(item.mediaId),
-      position: Number(item.position ?? 0),
-      type: String(item.type ?? "IMAGE"),
-      processedKey:
-        typeof item.processedKey === "string" ? item.processedKey : undefined,
-      url: await getSignedProcessedMediaUrl(signingConfig, item.processedKey),
-      width: Number(item.width ?? 0),
-      height: Number(item.height ?? 0)
-    }))
+    (media as RawMedia[]).map(async (item) => {
+      const playlistKey =
+        typeof item.playlistKey === "string" ? item.playlistKey : undefined;
+      const hlsPrefix =
+        typeof item.hlsPrefix === "string" ? item.hlsPrefix : undefined;
+      const thumbnailKey =
+        typeof item.thumbnailKey === "string" ? item.thumbnailKey : undefined;
+      const processedKey =
+        typeof item.processedKey === "string" ? item.processedKey : undefined;
+      const renditions = toRenditionsResponse(item.renditions);
+      const hlsUrl =
+        playlistKey && hlsPrefix
+          ? await getSignedHlsManifestUrl(signingConfig, playlistKey, hlsPrefix)
+          : undefined;
+      const mediaUrl =
+        processedKey || thumbnailKey
+          ? await getSignedUrlResponse(
+              signingConfig,
+              processedKey ?? thumbnailKey
+            )
+          : undefined;
+
+      return {
+        mediaId: String(item.mediaId),
+        position: Number(item.position ?? 0),
+        type: String(item.type ?? "IMAGE"),
+        url: mediaUrl,
+        sources:
+          playlistKey && hlsUrl
+            ? {
+                hls: {
+                  url: hlsUrl,
+                  ...(renditions ? { renditions } : {})
+                }
+              }
+            : undefined,
+        width: Number(item.width ?? 0),
+        height: Number(item.height ?? 0)
+      };
+    })
   );
 };
 

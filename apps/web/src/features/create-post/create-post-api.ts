@@ -10,8 +10,14 @@ export type PostProcessingStatus =
 export type UploadMedia = {
   mediaId: string;
   position: number;
-  type: "IMAGE";
-  contentType: "image/jpeg" | "image/png" | "image/webp";
+  type: "IMAGE" | "VIDEO";
+  contentType:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp"
+    | "video/mp4"
+    | "video/quicktime"
+    | "video/webm";
   originalKey: string;
   uploadUrl: string;
 };
@@ -20,7 +26,6 @@ export type PostStatus = {
   postId: string;
   profileId: string;
   status: PostProcessingStatus;
-  media: unknown[];
   createdAt: string;
   updatedAt: string;
 };
@@ -43,8 +48,9 @@ export async function getPostUploadUrls({
     },
     body: JSON.stringify({
       profileId,
-      images: files.map((file) => ({
+      media: files.map((file) => ({
         contentType: file.type,
+        sizeBytes: file.size,
       })),
     }),
   });
@@ -85,10 +91,10 @@ export function uploadFile(
         return;
       }
 
-      reject(new Error("Image upload failed."));
+      reject(new Error("Media upload failed."));
     });
     request.addEventListener("error", () =>
-      reject(new Error("Image upload failed."))
+      reject(new Error("Media upload failed."))
     );
     request.open("PUT", uploadUrl);
     request.setRequestHeader("content-type", file.type);

@@ -1,7 +1,7 @@
 import { requireEnv } from "./env.js";
 import type { MediaSigningConfig } from "./media-signer.js";
 
-const defaultSignedUrlTtlSeconds = 60 * 15;
+export const defaultSignedUrlTtlSeconds = 60 * 30;
 
 export const getMediaSigningConfig = (): MediaSigningConfig => ({
   baseUrl: requireEnv("MEDIA_BASE_URL"),

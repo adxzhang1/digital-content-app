@@ -18,20 +18,41 @@ import {
   ProjectionType,
   Table
 } from "aws-cdk-lib/aws-dynamodb";
+import { Rule } from "aws-cdk-lib/aws-events";
+import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import {
   AllowedMethods,
   CachePolicy,
   Distribution,
+  Function as CloudFrontFunction,
+  FunctionCode,
+  FunctionEventType,
   KeyGroup,
+  OriginRequestPolicy,
   PriceClass,
   PublicKey,
+  ResponseHeadersPolicy,
   ViewerProtocolPolicy
 } from "aws-cdk-lib/aws-cloudfront";
-import { S3BucketOrigin } from "aws-cdk-lib/aws-cloudfront-origins";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
+import {
+  FunctionUrlOrigin,
+  S3BucketOrigin
+} from "aws-cdk-lib/aws-cloudfront-origins";
+import { FunctionUrlAuthType, Runtime } from "aws-cdk-lib/aws-lambda";
+import {
+  Effect,
+  PolicyStatement,
+  Role,
+  ServicePrincipal
+} from "aws-cdk-lib/aws-iam";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
-import { Bucket, BlockPublicAccess, HttpMethods } from "aws-cdk-lib/aws-s3";
+import {
+  Bucket,
+  BlockPublicAccess,
+  HttpMethods,
+  ObjectOwnership
+} from "aws-cdk-lib/aws-s3";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 
@@ -145,6 +166,22 @@ export class ApplicationStack extends cdk.Stack {
       autoDeleteObjects: true
     });
 
+    const cloudFrontLogsBucket = new Bucket(this, "CloudFrontLogsBucket", {
+      autoDeleteObjects: true,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      lifecycleRules: [
+        {
+          expiration: cdk.Duration.days(7)
+        }
+      ],
+      objectOwnership: ObjectOwnership.OBJECT_WRITER,
+      removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
+
+    const mediaConvertRole = new Role(this, "MediaConvertRole", {
+      assumedBy: new ServicePrincipal("mediaconvert.amazonaws.com")
+    });
+
     const mediaPublicKey = new PublicKey(this, "MediaPublicKey", {
       encodedKey: mediaSigningKeySecret
         .secretValueFromJson("publicKey")
@@ -158,19 +195,76 @@ export class ApplicationStack extends cdk.Stack {
       maxTtl: cdk.Duration.minutes(1),
       minTtl: cdk.Duration.seconds(0)
     });
+    const mediaViewerHostFunction = new CloudFrontFunction(
+      this,
+      "MediaViewerHostFunction",
+      {
+        code: FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var host = request.headers.host && request.headers.host.value;
+
+  if (host) {
+    request.headers["x-viewer-host"] = { value: host };
+  }
+
+  return request;
+}
+`)
+      }
+    );
+    const getSignedHlsManifestHandler = createHandler(
+      "GetSignedHlsManifestHandler",
+      "handlers/get-signed-hls-manifest.ts"
+    );
+    const getSignedHlsManifestUrl =
+      getSignedHlsManifestHandler.addFunctionUrl({
+        authType: FunctionUrlAuthType.AWS_IAM
+      });
 
     const mediaDistribution = new Distribution(this, "MediaDistribution", {
       defaultBehavior: {
         allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
         cachePolicy: mediaCachePolicy,
         origin: S3BucketOrigin.withOriginAccessControl(mediaBucket),
+        responseHeadersPolicy: ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS,
         trustedKeyGroups: [mediaKeyGroup],
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
       },
+      enableLogging: true,
+      logBucket: cloudFrontLogsBucket,
+      logFilePrefix: "media-distribution/",
+      logIncludesCookies: false,
       priceClass: PriceClass.PRICE_CLASS_100
     });
     const mediaBaseUrl = `https://${mediaDistribution.distributionDomainName}`;
-
+    mediaDistribution.addBehavior(
+      "posts/processed/*.m3u8",
+      FunctionUrlOrigin.withOriginAccessControl(getSignedHlsManifestUrl),
+      {
+        allowedMethods: AllowedMethods.ALLOW_GET_HEAD,
+        cachePolicy: CachePolicy.CACHING_DISABLED,
+        functionAssociations: [
+          {
+            eventType: FunctionEventType.VIEWER_REQUEST,
+            function: mediaViewerHostFunction
+          }
+        ],
+        originRequestPolicy: OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        responseHeadersPolicy: ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS,
+        trustedKeyGroups: [mediaKeyGroup],
+        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS
+      }
+    );
+    getSignedHlsManifestHandler.addPermission(
+      "AllowMediaDistributionFunctionUrlInvoke",
+      {
+        action: "lambda:InvokeFunction",
+        invokedViaFunctionUrl: true,
+        principal: new ServicePrincipal("cloudfront.amazonaws.com"),
+        sourceArn: mediaDistribution.distributionArn
+      }
+    );
     const postProcessingQueue = new Queue(this, "PostProcessingQueue", {
       visibilityTimeout: cdk.Duration.minutes(5)
     });
@@ -222,6 +316,10 @@ export class ApplicationStack extends cdk.Stack {
     const getPostStatusHandler = createHandler(
       "GetPostStatusHandler",
       "handlers/get-post-status.ts"
+    );
+    const completePostVideoProcessingHandler = createHandler(
+      "CompletePostVideoProcessingHandler",
+      "handlers/complete-post-video-processing.ts"
     );
     const getProfileHandler = createHandler(
       "GetProfileHandler",
@@ -383,6 +481,18 @@ export class ApplicationStack extends cdk.Stack {
       "MEDIA_SIGNING_KEY_SECRET_NAME",
       mediaSigningKeySecretName
     );
+    getSignedHlsManifestHandler.addEnvironment(
+      "MEDIA_BUCKET_NAME",
+      mediaBucket.bucketName
+    );
+    getSignedHlsManifestHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_PAIR_ID",
+      mediaPublicKey.publicKeyId
+    );
+    getSignedHlsManifestHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_SECRET_NAME",
+      mediaSigningKeySecretName
+    );
     deletePostHandler.addEnvironment("POSTS_TABLE_NAME", postsTable.tableName);
     deletePostHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
@@ -404,6 +514,14 @@ export class ApplicationStack extends cdk.Stack {
     processPostMediaHandler.addEnvironment(
       "MEDIA_BUCKET_NAME",
       mediaBucket.bucketName
+    );
+    processPostMediaHandler.addEnvironment(
+      "MEDIACONVERT_ROLE_ARN",
+      mediaConvertRole.roleArn
+    );
+    completePostVideoProcessingHandler.addEnvironment(
+      "POSTS_TABLE_NAME",
+      postsTable.tableName
     );
     processProfilePictureHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
@@ -453,7 +571,10 @@ export class ApplicationStack extends cdk.Stack {
     );
     mediaBucket.grantPut(createPostUploadUrlsHandler);
     mediaBucket.grantPut(createProfilePictureUploadHandler);
+    mediaBucket.grantRead(getSignedHlsManifestHandler);
+    mediaBucket.grantRead(deletePostHandler);
     mediaBucket.grantDelete(deletePostHandler);
+    mediaBucket.grantReadWrite(mediaConvertRole);
     usersTable.grantReadData(firebaseAuthorizerHandler);
     firebaseServiceAccountSecret.grantRead(firebaseAuthorizerHandler);
     mediaSigningKeySecret.grantRead(finalizePostHandler);
@@ -461,8 +582,33 @@ export class ApplicationStack extends cdk.Stack {
     mediaSigningKeySecret.grantRead(getProfileHandler);
     mediaSigningKeySecret.grantRead(getProfilePostsHandler);
     mediaSigningKeySecret.grantRead(getPostDetailHandler);
+    mediaSigningKeySecret.grantRead(getSignedHlsManifestHandler);
     mediaBucket.grantReadWrite(processPostMediaHandler);
     mediaBucket.grantReadWrite(processProfilePictureHandler);
+    processPostMediaHandler.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+          "mediaconvert:CreateJob",
+          "mediaconvert:Probe"
+        ],
+        resources: ["*"]
+      })
+    );
+    processPostMediaHandler.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["iam:PassRole"],
+        resources: [mediaConvertRole.roleArn]
+      })
+    );
+    deletePostHandler.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["mediaconvert:CancelJob"],
+        resources: ["*"]
+      })
+    );
     postProcessingQueue.grantSendMessages(finalizePostHandler);
     postProcessingQueue.grantConsumeMessages(processPostMediaHandler);
     profilePictureProcessingQueue.grantSendMessages(
@@ -484,6 +630,7 @@ export class ApplicationStack extends cdk.Stack {
     postsTable.grantWriteData(finalizePostHandler);
     postsTable.grantReadData(getPostStatusHandler);
     postsTable.grantReadWriteData(processPostMediaHandler);
+    postsTable.grantReadWriteData(completePostVideoProcessingHandler);
     postsTable.grantReadData(getProfilePostsHandler);
     postsTable.grantReadData(getPostDetailHandler);
     postsTable.grantReadWriteData(deletePostHandler);
@@ -518,6 +665,17 @@ export class ApplicationStack extends cdk.Stack {
     profilesTable.grantReadData(getPostDetailHandler);
     profilesTable.grantReadData(deletePostHandler);
     profilesTable.grantReadData(likePostHandler);
+
+    new Rule(this, "MediaConvertPostVideoCompletionRule", {
+      eventPattern: {
+        source: ["aws.mediaconvert"],
+        detailType: ["MediaConvert Job State Change"],
+        detail: {
+          status: ["COMPLETE", "ERROR"]
+        }
+      },
+      targets: [new LambdaFunction(completePostVideoProcessingHandler)]
+    });
 
     const api = new HttpApi(this, "HttpApi", {
       corsPreflight: {

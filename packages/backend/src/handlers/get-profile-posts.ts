@@ -25,6 +25,7 @@ type RawMedia = {
   position?: unknown;
   type?: unknown;
   processedKey?: unknown;
+  thumbnailKey?: unknown;
   width?: unknown;
   height?: unknown;
 };
@@ -38,7 +39,9 @@ const toThumbnailResponse = async (media: unknown) => {
     (left, right) => Number(left.position ?? 0) - Number(right.position ?? 0)
   )[0];
 
-  if (!thumbnail?.processedKey) {
+  const thumbnailKey = thumbnail?.thumbnailKey ?? thumbnail?.processedKey;
+
+  if (!thumbnailKey) {
     return null;
   }
 
@@ -46,11 +49,7 @@ const toThumbnailResponse = async (media: unknown) => {
     mediaId: String(thumbnail.mediaId),
     position: Number(thumbnail.position ?? 0),
     type: String(thumbnail.type ?? "IMAGE"),
-    processedKey: String(thumbnail.processedKey),
-    url: await getSignedProcessedMediaUrl(
-      mediaSigningConfig,
-      thumbnail.processedKey
-    ),
+    url: await getSignedProcessedMediaUrl(mediaSigningConfig, thumbnailKey),
     width: Number(thumbnail.width ?? 0),
     height: Number(thumbnail.height ?? 0)
   };

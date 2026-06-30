@@ -369,12 +369,22 @@
   cursor: grabbing;
 }
 
-.selectedFile img {
+.selectedVideoFile {
+  aspect-ratio: auto;
+}
+
+.selectedFile img,
+.selectedFile video {
   display: block;
   height: 100%;
   object-fit: cover;
   pointer-events: none;
   width: 100%;
+}
+
+.selectedVideoFile video {
+  height: auto;
+  object-fit: contain;
 }
 
 .draggingFile {

@@ -30,12 +30,74 @@ type Status =
     };
 
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+const allowedVideoTypes = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+] as const;
+type ImageContentType = (typeof allowedImageTypes)[number];
+type VideoContentType = (typeof allowedVideoTypes)[number];
+const maxVideoBytes = 50 * 1024 * 1024;
 
-const getSelectedImagesMessage = (count: number) =>
-  `${count} image${count === 1 ? "" : "s"} selected.`;
+const getSelectedMediaMessage = (selectedFiles: File[]) => {
+  const firstFile = selectedFiles[0];
 
-function isAllowedImageType(type: string): type is UploadMedia["contentType"] {
-  return allowedImageTypes.includes(type as UploadMedia["contentType"]);
+  if (firstFile && isAllowedVideoType(firstFile.type)) {
+    return "1 video selected.";
+  }
+
+  return `${selectedFiles.length} image${
+    selectedFiles.length === 1 ? "" : "s"
+  } selected.`;
+};
+
+function isAllowedImageType(type: string): type is ImageContentType {
+  return allowedImageTypes.includes(type as ImageContentType);
+}
+
+function isAllowedVideoType(type: string): type is VideoContentType {
+  return allowedVideoTypes.includes(type as VideoContentType);
+}
+
+function isAllowedMediaType(type: string): type is UploadMedia["contentType"] {
+  return isAllowedImageType(type) || isAllowedVideoType(type);
+}
+
+function VideoFilePreview({ src }: { src: string }) {
+  return (
+    <video
+      autoPlay
+      loop
+      muted
+      playsInline
+      preload="auto"
+      src={src}
+    />
+  );
+}
+
+function validateSelectedFiles(selectedFiles: File[]) {
+  const hasVideo = selectedFiles.some((file) => isAllowedVideoType(file.type));
+  const hasImage = selectedFiles.some((file) => isAllowedImageType(file.type));
+  const invalidFile = selectedFiles.find((file) => !isAllowedMediaType(file.type));
+
+  if (invalidFile) {
+    return "Media must be JPEG, PNG, WebP, MP4, MOV, or WebM.";
+  }
+
+  if (hasVideo && (hasImage || selectedFiles.length !== 1)) {
+    return "A video must be the only media item in a post.";
+  }
+
+  if (hasVideo && selectedFiles[0] && selectedFiles[0].size > maxVideoBytes) {
+    return "Video must be 50 MB or smaller.";
+  }
+
+  if (!hasVideo && selectedFiles.length > 10) {
+    return "Choose no more than 10 images.";
+  }
+
+  return null;
 }
 
 type CreatePostFormProps = {
@@ -70,7 +132,7 @@ export function CreatePostForm({
     }) => {
       setStatus({
         tone: "idle",
-        message: "Preparing image uploads...",
+        message: "Preparing media uploads...",
       });
       const uploadData = await getPostUploadUrls({
         files,
@@ -90,7 +152,7 @@ export function CreatePostForm({
 
       setStatus({
         tone: "idle",
-        message: "Uploading images...",
+        message: "Uploading media...",
       });
 
       await Promise.all(
@@ -103,7 +165,7 @@ export function CreatePostForm({
 
       setStatus({
         tone: "idle",
-        message: "Processing images...",
+        message: "Processing media...",
       });
 
       await createPost({
@@ -120,7 +182,7 @@ export function CreatePostForm({
       );
 
       if (completedPost.status === "FAILED") {
-        throw new Error("Image processing failed.");
+        throw new Error("Media processing failed.");
       }
 
       if (completedPost.status === "DELETED") {
@@ -169,30 +231,22 @@ export function CreatePostForm({
       return;
     }
 
-    const invalidFile = nextFiles.find((file) => !isAllowedImageType(file.type));
+    const validationError = validateSelectedFiles(nextFiles);
+
+    if (validationError) {
+      setStatus({
+        tone: "error",
+        message: validationError,
+      });
+      return;
+    }
 
     replaceFiles(nextFiles);
     setActiveDraggedFileIndex(null);
 
-    if (nextFiles.length > 10) {
-      setStatus({
-        tone: "error",
-        message: "Choose no more than 10 images.",
-      });
-      return;
-    }
-
-    if (invalidFile) {
-      setStatus({
-        tone: "error",
-        message: "Images must be JPEG, PNG, or WebP.",
-      });
-      return;
-    }
-
     setStatus({
       tone: "idle",
-      message: getSelectedImagesMessage(nextFiles.length),
+      message: getSelectedMediaMessage(nextFiles),
     });
   }
 
@@ -227,7 +281,7 @@ export function CreatePostForm({
   }
 
   function handleFilePointerDown(
-    event: PointerEvent<HTMLButtonElement>,
+    event: PointerEvent<HTMLElement>,
     index: number
   ) {
     if (isSubmitting) {
@@ -238,7 +292,7 @@ export function CreatePostForm({
     setActiveDraggedFileIndex(index);
   }
 
-  function handleFilePointerMove(event: PointerEvent<HTMLButtonElement>) {
+  function handleFilePointerMove(event: PointerEvent<HTMLElement>) {
     const fromIndex = draggedFileIndexRef.current;
 
     if (fromIndex === null) {
@@ -270,17 +324,16 @@ export function CreatePostForm({
     const trimmedCaption = caption.trim();
 
     if (files.length === 0) {
-      setStatus({
-        tone: "error",
-        message: "Choose at least one image.",
-      });
+      setStatus({ tone: "error", message: "Choose at least one media item." });
       return;
     }
 
-    if (files.length > 10 || files.some((file) => !isAllowedImageType(file.type))) {
+    const validationError = validateSelectedFiles(files);
+
+    if (validationError) {
       setStatus({
         tone: "error",
-        message: "Choose 1-10 JPEG, PNG, or WebP images.",
+        message: validationError,
       });
       return;
     }
@@ -315,7 +368,7 @@ export function CreatePostForm({
     <form className={styles.form} onSubmit={handleSubmit}>
       <label>
         <input
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
           aria-label="Attach media"
           key={fileInputKey}
           multiple
@@ -327,12 +380,18 @@ export function CreatePostForm({
       {filePreviews.length > 0 ? (
         <div className={styles.selectedFiles}>
           {filePreviews.map((preview, index) => (
-            <button
+            <div
               aria-label={`Move ${preview.file.name}`}
               className={
-                draggedFileIndex === index
-                  ? `${styles.selectedFile} ${styles.draggingFile}`
-                  : styles.selectedFile
+                [
+                  styles.selectedFile,
+                  isAllowedVideoType(preview.file.type)
+                    ? styles.selectedVideoFile
+                    : "",
+                  draggedFileIndex === index ? styles.draggingFile : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")
               }
               data-file-index={index}
               key={`${preview.file.name}-${preview.file.lastModified}-${index}`}
@@ -340,10 +399,15 @@ export function CreatePostForm({
               onPointerDown={(event) => handleFilePointerDown(event, index)}
               onPointerMove={handleFilePointerMove}
               onPointerUp={handleFilePointerEnd}
-              type="button"
+              role="button"
+              tabIndex={0}
             >
-              <img alt="" src={preview.url} />
-            </button>
+              {isAllowedVideoType(preview.file.type) ? (
+                <VideoFilePreview src={preview.url} />
+              ) : (
+                <img alt="" src={preview.url} />
+              )}
+            </div>
           ))}
         </div>
       ) : null}

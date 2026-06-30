@@ -16,20 +16,57 @@ import { s3Client } from "../lib/s3.js";
 import { json, parseJsonBody } from "../lib/http.js";
 
 const mediaBucketName = requireEnv("MEDIA_BUCKET_NAME");
+const maxVideoBytes = 50 * 1024 * 1024;
 
-const imageSchema = z.object({
-  contentType: z.enum(["image/jpeg", "image/png", "image/webp"])
+const imageContentTypeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
+const videoContentTypeSchema = z.enum([
+  "video/mp4",
+  "video/quicktime",
+  "video/webm"
+]);
+
+const mediaSchema = z.object({
+  contentType: z.union([imageContentTypeSchema, videoContentTypeSchema]),
+  sizeBytes: z.number().int().positive().optional()
 });
 
-const uploadUrlsSchema = z.object({
-  profileId: z.string().trim().min(1, "Profile id is required."),
-  images: z.array(imageSchema).min(1).max(10)
-});
+const uploadUrlsSchema = z
+  .object({
+    profileId: z.string().trim().min(1, "Profile id is required."),
+    media: z.array(mediaSchema).min(1).max(10)
+  })
+  .superRefine((value, context) => {
+    const videoItems = value.media.filter((item) =>
+      videoContentTypeSchema.safeParse(item.contentType).success
+    );
+
+    if (videoItems.length > 0 && value.media.length !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "A video must be the only media item in a post."
+      });
+    }
+
+    const videoItem = videoItems[0];
+
+    if (
+      videoItem &&
+      (!videoItem.sizeBytes || videoItem.sizeBytes > maxVideoBytes)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Video must be 50 MB or smaller."
+      });
+    }
+  });
 
 const extensionByContentType = {
   "image/jpeg": "jpg",
   "image/png": "png",
-  "image/webp": "webp"
+  "image/webp": "webp",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm"
 } as const;
 
 export async function handler(
@@ -56,7 +93,7 @@ export async function handler(
     });
   }
 
-  const { profileId, images } = parsedBody.data;
+  const { profileId, media: mediaItems } = parsedBody.data;
   let authenticatedUser;
 
   try {
@@ -80,17 +117,17 @@ export async function handler(
 
   const postId = `post_${uuidv7()}`;
   const media = await Promise.all(
-    images.map(async (image, position) => {
+    mediaItems.map(async (item, position) => {
       const mediaId = `m_${uuidv7()}`;
       const originalKey = `posts/original/${profileId}/${postId}/${position}-${mediaId}.${
-        extensionByContentType[image.contentType]
+        extensionByContentType[item.contentType]
       }`;
       const uploadUrl = await getSignedUrl(
         s3Client,
         new PutObjectCommand({
           Bucket: mediaBucketName,
           Key: originalKey,
-          ContentType: image.contentType
+          ContentType: item.contentType
         }),
         {
           expiresIn: 900
@@ -100,8 +137,10 @@ export async function handler(
       return {
         mediaId,
         position,
-        type: "IMAGE",
-        contentType: image.contentType,
+        type: videoContentTypeSchema.safeParse(item.contentType).success
+          ? "VIDEO"
+          : "IMAGE",
+        contentType: item.contentType,
         originalKey,
         uploadUrl
       };

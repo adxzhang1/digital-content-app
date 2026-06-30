@@ -52,10 +52,6 @@ const toProfilePictureResponse = async (
 
   return {
     imageId: String(picture.imageId ?? ""),
-    processedKey:
-      typeof picture.processedKey === "string"
-        ? picture.processedKey
-        : undefined,
     url: await getSignedProcessedMediaUrl(signingConfig, picture.processedKey),
     width: Number(picture.width ?? 0),
     height: Number(picture.height ?? 0)

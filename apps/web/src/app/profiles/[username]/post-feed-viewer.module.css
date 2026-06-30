@@ -33,12 +33,99 @@
 .modalImage {
   backface-visibility: hidden;
   display: block;
-  height: 100dvh;
+  height: 100%;
   object-fit: contain;
   transform: translateZ(0);
   user-select: none;
   -webkit-user-drag: none;
   width: 100%;
+}
+
+.videoOverlay {
+  align-items: center;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  touch-action: manipulation;
+  z-index: 1;
+}
+
+.videoControlIcon {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.36);
+  border-radius: 999px;
+  color: #ffffff;
+  display: flex;
+  height: 74px;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.92);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  width: 74px;
+}
+
+.videoControlIconVisible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.videoPlayIcon {
+  border-bottom: 17px solid transparent;
+  border-left: 26px solid currentColor;
+  border-top: 17px solid transparent;
+  display: block;
+  height: 0;
+  margin-left: 6px;
+  width: 0;
+}
+
+.videoPauseIcon {
+  display: block;
+  height: 34px;
+  position: relative;
+  width: 28px;
+}
+
+.videoPauseIcon::before,
+.videoPauseIcon::after {
+  background: currentColor;
+  border-radius: 2px;
+  content: "";
+  height: 100%;
+  position: absolute;
+  top: 0;
+  width: 9px;
+}
+
+.videoPauseIcon::before {
+  left: 0;
+}
+
+.videoPauseIcon::after {
+  right: 0;
+}
+
+video.modalImage {
+  inset: 0;
+  position: absolute;
+}
+
+.videoLoading {
+  visibility: hidden;
+}
+
+.videoImageHidden {
+  visibility: hidden;
 }
 
 .modalImageCover {
