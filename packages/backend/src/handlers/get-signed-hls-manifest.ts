@@ -92,15 +92,7 @@ const getS3Text = async (key: string) => {
   return result.Body.transformToString();
 };
 
-const getSegmentSignedParams = async (
-  hlsPrefix: string,
-  mediaBaseUrl: string
-) => {
-  const signedUrl = await getSignedCloudFrontUrlWithPolicy({
-    config: getSigningConfig(mediaBaseUrl),
-    resourceUrl: `${mediaBaseUrl}/${hlsPrefix}/*.ts`,
-    url: getMediaUrl(mediaBaseUrl, `${hlsPrefix}/segment.ts`)
-  });
+const getSignedParams = (signedUrl: string) => {
   const signedParams = new URL(signedUrl).searchParams;
   const params = new URLSearchParams();
 
@@ -113,6 +105,20 @@ const getSegmentSignedParams = async (
   }
 
   return params;
+};
+
+const getSegmentSignedParams = async (
+  hlsPrefix: string,
+  mediaBaseUrl: string,
+  extension: string
+) => {
+  const signedUrl = await getSignedCloudFrontUrlWithPolicy({
+    config: getSigningConfig(mediaBaseUrl),
+    resourceUrl: `${mediaBaseUrl}/${hlsPrefix}/*.${extension}`,
+    url: getMediaUrl(mediaBaseUrl, `${hlsPrefix}/segment.${extension}`)
+  });
+
+  return getSignedParams(signedUrl);
 };
 
 const appendQueryParams = (url: string, params: URLSearchParams) => {
@@ -126,6 +132,13 @@ const appendQueryParams = (url: string, params: URLSearchParams) => {
 };
 
 const isManifestLine = (line: string) => line.split("?")[0]?.endsWith(".m3u8");
+const getFileExtension = (uri: string) =>
+  uri
+    .split("?")[0]
+    ?.split("/")
+    .pop()
+    ?.match(/\.([^.]+)$/)?.[1];
+const hlsMediaUriPattern = /URI="([^"]+)"/;
 
 const getSignedManifestParams = async (
   hlsPrefix: string,
@@ -137,51 +150,76 @@ const getSignedManifestParams = async (
     resourceUrl: `${mediaBaseUrl}/${hlsPrefix}/*.m3u8`,
     url: getMediaUrl(mediaBaseUrl, key)
   });
-  const signedParams = new URL(signedUrl).searchParams;
-  const params = new URLSearchParams();
 
-  for (const name of signedParamNames) {
-    const value = signedParams.get(name);
-
-    if (value) {
-      params.set(name, value);
-    }
-  }
-
-  return params;
+  return getSignedParams(signedUrl);
 };
 
 const rewriteManifest = async ({
   manifest,
   manifestKey,
-  mediaBaseUrl,
-  segmentSignedParams
+  mediaBaseUrl
 }: {
   manifest: string;
   manifestKey: string;
   mediaBaseUrl: string;
-  segmentSignedParams: URLSearchParams;
 }) => {
   const hlsPrefix = getHlsPrefix(manifestKey);
+  const segmentParamsByExtension = new Map<string, Promise<URLSearchParams>>();
+  const getSignedManifestUri = async (uri: string) => {
+    const childManifestParams = await getSignedManifestParams(
+      hlsPrefix,
+      mediaBaseUrl,
+      resolveRelativeKey(manifestKey, uri)
+    );
+
+    return appendQueryParams(uri, childManifestParams);
+  };
+  const getSignedSegmentUri = async (uri: string) => {
+    const extension = getFileExtension(uri);
+
+    if (!extension) {
+      return uri;
+    }
+
+    const segmentParams =
+      segmentParamsByExtension.get(extension) ??
+      getSegmentSignedParams(hlsPrefix, mediaBaseUrl, extension);
+
+    segmentParamsByExtension.set(extension, segmentParams);
+
+    return appendQueryParams(uri, await segmentParams);
+  };
+  const getSignedMediaTag = async (line: string) => {
+    const match = line.match(hlsMediaUriPattern);
+    const uri = match?.[1];
+
+    if (!match || !uri || !isManifestLine(uri)) {
+      return line;
+    }
+
+    return line.replace(match[0], `URI="${await getSignedManifestUri(uri)}"`);
+  };
   const lines = await Promise.all(
     manifest.split(/\r?\n/).map(async (line) => {
       const trimmedLine = line.trim();
 
-      if (!trimmedLine || trimmedLine.startsWith("#")) {
+      if (!trimmedLine) {
+        return line;
+      }
+
+      if (trimmedLine.startsWith("#EXT-X-MEDIA:")) {
+        return getSignedMediaTag(line);
+      }
+
+      if (trimmedLine.startsWith("#")) {
         return line;
       }
 
       if (isManifestLine(trimmedLine)) {
-        const childManifestParams = await getSignedManifestParams(
-          hlsPrefix,
-          mediaBaseUrl,
-          resolveRelativeKey(manifestKey, trimmedLine)
-        );
-
-        return appendQueryParams(trimmedLine, childManifestParams);
+        return getSignedManifestUri(trimmedLine);
       }
 
-      return appendQueryParams(trimmedLine, segmentSignedParams);
+      return getSignedSegmentUri(trimmedLine);
     })
   );
 
@@ -209,11 +247,6 @@ export async function handler(
   }
 
   const manifest = await getS3Text(manifestKey);
-  const segmentSignedParams = await getSegmentSignedParams(
-    getHlsPrefix(manifestKey),
-    mediaBaseUrl
-  );
-
   return {
     statusCode: 200,
     headers: {
@@ -223,8 +256,7 @@ export async function handler(
     body: await rewriteManifest({
       manifest,
       manifestKey,
-      mediaBaseUrl,
-      segmentSignedParams
+      mediaBaseUrl
     })
   };
 }

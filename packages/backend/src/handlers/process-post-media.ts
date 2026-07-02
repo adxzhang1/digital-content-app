@@ -10,7 +10,7 @@ import {
   H264GopSizeUnits,
   H264QualityTuningLevel,
   H264RateControlMode,
-  HlsSegmentLengthControl,
+  HlsAudioTrackType,
   InputTimecodeSource,
   OutputGroupType,
   ProbeCommand,
@@ -29,6 +29,7 @@ import { s3Client } from "../lib/s3.js";
 const mediaBucketName = requireEnv("MEDIA_BUCKET_NAME");
 const postsTableName = requireEnv("POSTS_TABLE_NAME");
 const mediaConvertRoleArn = requireEnv("MEDIACONVERT_ROLE_ARN");
+const hlsAudioGroupId = "audio";
 
 type ImagePostMedia = {
   mediaId: string;
@@ -123,6 +124,7 @@ const createVideoOutput = ({
       H264Settings: {
         CodecProfile: H264CodecProfile.HIGH,
         FramerateControl: H264FramerateControl.INITIALIZE_FROM_SOURCE,
+        GopClosedCadence: 1,
         GopSize: 2,
         GopSizeUnits: H264GopSizeUnits.SECONDS,
         MaxBitrate: bitrate,
@@ -133,6 +135,18 @@ const createVideoOutput = ({
         RateControlMode: H264RateControlMode.QVBR
       }
     }
+  },
+  OutputSettings: {
+    HlsSettings: {
+      AudioRenditionSets: hlsAudioGroupId
+    }
+  }
+});
+
+const createAudioOutput = (): Output => ({
+  NameModifier: "-audio",
+  ContainerSettings: {
+    Container: ContainerType.M3U8
   },
   AudioDescriptions: [
     {
@@ -148,7 +162,10 @@ const createVideoOutput = ({
     }
   ],
   OutputSettings: {
-    HlsSettings: {}
+    HlsSettings: {
+      AudioGroupId: hlsAudioGroupId,
+      AudioTrackType: HlsAudioTrackType.ALTERNATE_AUDIO_AUTO_SELECT_DEFAULT
+    }
   }
 });
 
@@ -259,8 +276,7 @@ async function submitVideoJob(
               HlsGroupSettings: {
                 Destination: getS3Url(`${hlsBaseKey}/master`),
                 MinSegmentLength: 0,
-                SegmentLength: 4,
-                SegmentLengthControl: HlsSegmentLengthControl.EXACT
+                SegmentLength: 2
               }
             },
             Outputs: [
@@ -273,7 +289,8 @@ async function submitVideoJob(
                 ...rendition480,
                 bitrate: 1_200_000,
                 nameModifier: "-480"
-              })
+              }),
+              createAudioOutput()
             ]
           },
           {
