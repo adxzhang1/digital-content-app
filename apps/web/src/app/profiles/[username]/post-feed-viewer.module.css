@@ -30,7 +30,7 @@
   user-select: none;
 }
 
-.modalImage {
+.mediaElement {
   backface-visibility: hidden;
   display: block;
   height: 100%;
@@ -52,6 +52,7 @@
   inset: 0;
   justify-content: center;
   padding: 0;
+  pointer-events: auto;
   position: absolute;
   touch-action: manipulation;
   z-index: 1;
@@ -115,20 +116,42 @@
   right: 0;
 }
 
-video.modalImage {
+video.mediaElement {
   inset: 0;
   position: absolute;
 }
 
-.videoLoading {
+.videoHost {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.videoParkingHost {
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  width: 0;
+}
+
+.videoHiddenUntilReady {
   visibility: hidden;
 }
 
-.videoImageHidden {
+.mediaImageHidden {
   visibility: hidden;
 }
 
-.modalImageCover {
+.parkedVideoElement {
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 0;
+}
+
+.mediaElementCover {
   object-fit: cover;
 }
 
@@ -298,5 +321,4 @@ video.modalImage {
     height: 38px;
     width: 38px;
   }
-
 }

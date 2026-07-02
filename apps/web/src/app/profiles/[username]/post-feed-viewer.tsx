@@ -11,6 +11,10 @@ import {
   postDetailQueryKey,
 } from "@/features/profile/profile-post-api";
 import { PostFeedItem, type DeleteMode } from "./post-feed-item";
+import {
+  PostMediaVideoManager,
+  type ActiveVideo,
+} from "./post-media-video";
 import styles from "./post-feed-viewer.module.css";
 import type {
   ProfilePostDetail,
@@ -66,6 +70,32 @@ export function PostFeedViewer({
     },
   });
   const activePostDetail = activePostDetailQuery.data ?? null;
+  const activeVideo = useMemo<ActiveVideo | null>(() => {
+    if (!activePostDetail) {
+      return null;
+    }
+
+    if (activePostDetail.media.length !== 1) {
+      return null;
+    }
+
+    const activeMediaItem = activePostDetail.media[0];
+    const hlsUrl = activeMediaItem?.sources?.hls?.url;
+
+    if (
+      !activeMediaItem ||
+      activeMediaItem.type !== "VIDEO" ||
+      !hlsUrl
+    ) {
+      return null;
+    }
+
+    return {
+      hlsUrl,
+      mediaItemId: activeMediaItem.mediaId,
+      postId: activePostDetail.postId,
+    };
+  }, [activePostDetail]);
   const postError =
     deleteError ??
     (activePostDetailQuery.error instanceof Error
@@ -208,13 +238,18 @@ export function PostFeedViewer({
     >
       <article className={styles.modal}>
         <div className={styles.feedShell}>
-          <ScrollSnapFeed
-            activeItemId={activePostId}
-            ariaLabel="Post feed"
-            items={feedPosts}
-            onActiveItemChange={handleActivePostChange}
-            renderItem={renderFeedPost}
-          />
+          <PostMediaVideoManager
+            activeVideo={activeVideo}
+            isImageCover={isImageCover}
+          >
+            <ScrollSnapFeed
+              activeItemId={activePostId}
+              ariaLabel="Post feed"
+              items={feedPosts}
+              onActiveItemChange={handleActivePostChange}
+              renderItem={renderFeedPost}
+            />
+          </PostMediaVideoManager>
           <button
             aria-label="Close post"
             className={styles.modalClose}
