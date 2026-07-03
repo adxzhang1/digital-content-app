@@ -13,7 +13,10 @@ import {
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
 import styles from "./post-feed-viewer.module.css";
-import { VideoControlButton } from "./post-media-video-control";
+import {
+  VideoControlButton,
+  type VideoDimensions,
+} from "./post-media-video-control";
 import type { ReactNode } from "react";
 
 export type ActiveVideo = {
@@ -137,6 +140,8 @@ const VideoManager = memo(function VideoManager({
     mediaItemId: string;
     videoUrl: string;
   } | null>(null);
+  const [videoDimensions, setVideoDimensions] =
+    useState<VideoDimensions | null>(null);
   const isVideoReady = Boolean(
     activeMediaItemId &&
       activeVideoUrl &&
@@ -191,6 +196,7 @@ const VideoManager = memo(function VideoManager({
 
     // Clear readiness before detaching or setting up the active video source.
     setReadySource(null);
+    setVideoDimensions(null);
 
     // No active video means the shared node should be fully detached from media.
     if (!mediaItemId || !videoUrl) {
@@ -202,6 +208,21 @@ const VideoManager = memo(function VideoManager({
 
     let didCancel = false;
     let hls: Hls | undefined;
+    const updateVideoDimensions = (dimensions?: {
+      height?: number;
+      width?: number;
+    }) => {
+      const height = dimensions?.height;
+
+      if (didCancel || !height) {
+        return;
+      }
+
+      setVideoDimensions({
+        height,
+        width: dimensions.width || null,
+      });
+    };
     const markVideoReady = () => {
       // Wait for an actual decoded frame when the browser exposes that signal.
       const revealVideo = () => {
@@ -228,11 +249,19 @@ const VideoManager = memo(function VideoManager({
 
       void video.play().catch(() => {});
     };
+    const updateNativeVideoDimensions = () => {
+      updateVideoDimensions({
+        height: video.videoHeight,
+        width: video.videoWidth,
+      });
+    };
     const setupVideo = () => {
       // Safari can play HLS directly without hls.js.
       if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.addEventListener("playing", markVideoReady, { once: true });
         video.addEventListener("loadedmetadata", playVideo, { once: true });
+        video.addEventListener("loadedmetadata", updateNativeVideoDimensions);
+        video.addEventListener("resize", updateNativeVideoDimensions);
         video.src = videoUrl;
         return;
       }
@@ -257,6 +286,12 @@ const VideoManager = memo(function VideoManager({
 
         playVideo();
       });
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        updateVideoDimensions(hls?.levels[data.level]);
+      });
+      hls.on(Hls.Events.FRAG_CHANGED, (_, data) => {
+        updateVideoDimensions(hls?.levels[data.frag.level]);
+      });
       video.addEventListener("playing", markVideoReady, { once: true });
       hls.attachMedia(video);
     };
@@ -270,6 +305,8 @@ const VideoManager = memo(function VideoManager({
       hls?.destroy();
       video.removeEventListener("playing", markVideoReady);
       video.removeEventListener("loadedmetadata", playVideo);
+      video.removeEventListener("loadedmetadata", updateNativeVideoDimensions);
+      video.removeEventListener("resize", updateNativeVideoDimensions);
       video.removeAttribute("src");
       video.load();
     };
@@ -301,7 +338,10 @@ const VideoManager = memo(function VideoManager({
       />
       {hostedActiveVideo && activeHost
         ? createPortal(
-            <VideoControlButton videoRef={videoRef} />,
+            <VideoControlButton
+              videoDimensions={videoDimensions}
+              videoRef={videoRef}
+            />,
             activeHost,
           )
         : null}

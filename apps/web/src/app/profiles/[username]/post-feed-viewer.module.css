@@ -80,6 +80,29 @@
   transform: scale(1);
 }
 
+.videoTimestamp {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.48);
+  border-radius: 999px;
+  bottom: 18px;
+  color: #ffffff;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  gap: 8px;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 7px 10px;
+  pointer-events: none;
+  position: absolute;
+  right: 18px;
+}
+
+.videoQuality {
+  border-left: 1px solid rgba(255, 255, 255, 0.32);
+  padding-left: 8px;
+}
+
 .videoPlayIcon {
   border-bottom: 17px solid transparent;
   border-left: 26px solid currentColor;
