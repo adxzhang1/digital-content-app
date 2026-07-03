@@ -63,6 +63,10 @@ function isAllowedMediaType(type: string): type is UploadMedia["contentType"] {
   return isAllowedImageType(type) || isAllowedVideoType(type);
 }
 
+function getSelectedFileType(file: File) {
+  return file.type || "unknown";
+}
+
 function VideoFilePreview({ src }: { src: string }) {
   return (
     <video
@@ -82,7 +86,7 @@ function validateSelectedFiles(selectedFiles: File[]) {
   const invalidFile = selectedFiles.find((file) => !isAllowedMediaType(file.type));
 
   if (invalidFile) {
-    return "Media must be JPEG, PNG, WebP, MP4, MOV, or WebM.";
+    return `Media must be JPEG, PNG, WebP, MP4, MOV, or WebM. Selected file type: ${getSelectedFileType(invalidFile)}.`;
   }
 
   if (hasVideo && (hasImage || selectedFiles.length !== 1)) {

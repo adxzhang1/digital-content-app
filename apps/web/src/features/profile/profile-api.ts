@@ -34,6 +34,10 @@ function isProfilePictureContentType(
   );
 }
 
+function getSelectedFileType(file: File) {
+  return file.type || "unknown";
+}
+
 export async function getProfile(
   username: string,
   init?: RequestInit
@@ -93,7 +97,9 @@ export async function updateCurrentProfile({
 
 export async function createProfilePictureUpload(file: File) {
   if (!isProfilePictureContentType(file.type)) {
-    throw new Error("Profile picture must be JPEG, PNG, or WebP.");
+    throw new Error(
+      `Profile picture must be JPEG, PNG, or WebP. Selected file type: ${getSelectedFileType(file)}.`
+    );
   }
 
   const idToken = await getCurrentIdToken();
