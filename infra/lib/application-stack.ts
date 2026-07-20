@@ -157,7 +157,7 @@ export class ApplicationStack extends cdk.Stack {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       cors: [
         {
-          allowedMethods: [HttpMethods.PUT],
+          allowedMethods: [HttpMethods.POST],
           allowedOrigins: ["*"],
           allowedHeaders: ["*"]
         }
@@ -305,9 +305,9 @@ function handler(event) {
       "GetProfilePictureStatusHandler",
       "handlers/get-profile-picture-status.ts"
     );
-    const createPostUploadUrlsHandler = createHandler(
-      "CreatePostUploadUrlsHandler",
-      "handlers/create-post-upload-urls.ts"
+    const createPostUploadHandler = createHandler(
+      "CreatePostUploadHandler",
+      "handlers/create-post-upload.ts"
     );
     const finalizePostHandler = createHandler(
       "FinalizePostHandler",
@@ -390,7 +390,7 @@ function handler(event) {
       }
     );
 
-    createPostUploadUrlsHandler.addEnvironment(
+    createPostUploadHandler.addEnvironment(
       "MEDIA_BUCKET_NAME",
       mediaBucket.bucketName
     );
@@ -569,7 +569,7 @@ function handler(event) {
       "MEDIA_SIGNING_KEY_SECRET_NAME",
       mediaSigningKeySecretName
     );
-    mediaBucket.grantPut(createPostUploadUrlsHandler);
+    mediaBucket.grantPut(createPostUploadHandler);
     mediaBucket.grantPut(createProfilePictureUploadHandler);
     mediaBucket.grantRead(getSignedHlsManifestHandler);
     mediaBucket.grantRead(deletePostHandler);
@@ -772,12 +772,12 @@ function handler(event) {
     });
 
     api.addRoutes({
-      path: "/posts/upload-urls",
+      path: "/posts/upload",
       methods: [HttpMethod.POST],
       authorizer: firebaseAuthorizer,
       integration: new HttpLambdaIntegration(
-        "CreatePostUploadUrlsIntegration",
-        createPostUploadUrlsHandler
+        "CreatePostUploadIntegration",
+        createPostUploadHandler
       )
     });
 

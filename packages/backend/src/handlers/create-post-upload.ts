@@ -2,8 +2,7 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2
 } from "aws-lambda";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import {
@@ -27,10 +26,10 @@ const videoContentTypeSchema = z.enum([
 
 const mediaSchema = z.object({
   contentType: z.union([imageContentTypeSchema, videoContentTypeSchema]),
-  sizeBytes: z.number().int().positive().optional()
+  sizeBytes: z.number().int().positive()
 });
 
-const uploadUrlsSchema = z
+const uploadRequestSchema = z
   .object({
     profileId: z.string().trim().min(1, "Profile id is required."),
     media: z.array(mediaSchema).min(1).max(10)
@@ -83,13 +82,13 @@ export async function handler(
     });
   }
 
-  const parsedBody = uploadUrlsSchema.safeParse(body);
+  const parsedBody = uploadRequestSchema.safeParse(body);
 
   if (!parsedBody.success) {
     return json(400, {
       code: "INVALID_UPLOAD_REQUEST",
       message:
-        parsedBody.error.issues[0]?.message ?? "Invalid upload URL payload."
+        parsedBody.error.issues[0]?.message ?? "Invalid upload payload."
     });
   }
 
@@ -111,7 +110,7 @@ export async function handler(
   if (!userOwnsProfile(authenticatedUser, profileId)) {
     return json(403, {
       code: "PROFILE_ACCESS_DENIED",
-      message: "Only the profile owner can create upload URLs."
+      message: "Only the profile owner can create uploads."
     });
   }
 
@@ -122,15 +121,19 @@ export async function handler(
       const originalKey = `posts/original/${profileId}/${postId}/${position}-${mediaId}.${
         extensionByContentType[item.contentType]
       }`;
-      const uploadUrl = await getSignedUrl(
+      const upload = await createPresignedPost(
         s3Client,
-        new PutObjectCommand({
+        {
           Bucket: mediaBucketName,
           Key: originalKey,
-          ContentType: item.contentType
-        }),
-        {
-          expiresIn: 900
+          Conditions: [
+            ["content-length-range", 1, item.sizeBytes],
+            ["eq", "$Content-Type", item.contentType]
+          ],
+          Fields: {
+            "Content-Type": item.contentType
+          },
+          Expires: 900
         }
       );
 
@@ -142,7 +145,7 @@ export async function handler(
           : "IMAGE",
         contentType: item.contentType,
         originalKey,
-        uploadUrl
+        upload
       };
     })
   );

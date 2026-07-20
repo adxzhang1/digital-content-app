@@ -26,6 +26,11 @@ type ProfilePictureStatus = {
   updatedAt?: string;
 };
 
+type PresignedPostUpload = {
+  url: string;
+  fields: Record<string, string>;
+};
+
 function isProfilePictureContentType(
   contentType: string
 ): contentType is ProfilePictureContentType {
@@ -111,31 +116,38 @@ export async function createProfilePictureUpload(file: File) {
     },
     body: JSON.stringify({
       contentType: file.type,
+      sizeBytes: file.size,
     }),
   });
   const data = (await response.json()) as {
     profilePicture?: ProfilePictureStatus;
-    uploadUrl?: string;
+    upload?: PresignedPostUpload;
     message?: string;
   };
 
-  if (!response.ok || !data.profilePicture?.imageId || !data.uploadUrl) {
+  if (!response.ok || !data.profilePicture?.imageId || !data.upload) {
     throw new Error(data.message ?? "Could not prepare profile picture upload.");
   }
 
   return {
     imageId: data.profilePicture.imageId,
-    uploadUrl: data.uploadUrl,
+    upload: data.upload,
   };
 }
 
 export function uploadProfilePictureFile(
   file: File,
-  uploadUrl: string,
+  upload: PresignedPostUpload,
   onProgress: (progress: number) => void
 ) {
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
+    const formData = new FormData();
+
+    Object.entries(upload.fields).forEach(([name, value]) => {
+      formData.append(name, value);
+    });
+    formData.append("file", file);
 
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -154,9 +166,8 @@ export function uploadProfilePictureFile(
     request.addEventListener("error", () =>
       reject(new Error("Profile picture upload failed."))
     );
-    request.open("PUT", uploadUrl);
-    request.setRequestHeader("content-type", file.type);
-    request.send(file);
+    request.open("POST", upload.url);
+    request.send(formData);
   });
 }
 

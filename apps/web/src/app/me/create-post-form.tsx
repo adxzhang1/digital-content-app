@@ -7,7 +7,7 @@ import { profileQueryKey } from "@/features/profile/profile-api";
 import { profilePostsQueryKey } from "@/features/profile/profile-post-api";
 import {
   createPost,
-  getPostUploadUrls,
+  createPostUpload,
   uploadFile,
   waitForPostStatus,
   type UploadMedia,
@@ -138,7 +138,7 @@ export function CreatePostForm({
         tone: "idle",
         message: "Preparing media uploads...",
       });
-      const uploadData = await getPostUploadUrls({
+      const uploadData = await createPostUpload({
         files,
         profileId,
       });
@@ -161,7 +161,7 @@ export function CreatePostForm({
 
       await Promise.all(
         files.map((file, index) =>
-          uploadFile(file, uploadData.media[index].uploadUrl, (loaded) =>
+          uploadFile(file, uploadData.media[index].upload, (loaded) =>
             updateProgress(index, loaded)
           )
         )

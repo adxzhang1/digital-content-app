@@ -39,7 +39,7 @@ export function EditProfilePicture({
 
       await uploadProfilePictureFile(
         imageFile,
-        uploadData.uploadUrl,
+        uploadData.upload,
         setImageProgress
       );
       const profilePicture = await completeProfilePictureUpload({

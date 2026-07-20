@@ -19,7 +19,10 @@ export type UploadMedia = {
     | "video/quicktime"
     | "video/webm";
   originalKey: string;
-  uploadUrl: string;
+  upload: {
+    url: string;
+    fields: Record<string, string>;
+  };
 };
 
 export type PostStatus = {
@@ -32,7 +35,7 @@ export type PostStatus = {
 
 const apiBaseUrl = publicConfig.apiBaseUrl;
 
-export async function getPostUploadUrls({
+export async function createPostUpload({
   files,
   profileId,
 }: {
@@ -40,7 +43,7 @@ export async function getPostUploadUrls({
   profileId: string;
 }) {
   const idToken = await getCurrentIdToken();
-  const response = await fetch(`${apiBaseUrl}/posts/upload-urls`, {
+  const response = await fetch(`${apiBaseUrl}/posts/upload`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${idToken}`,
@@ -73,11 +76,17 @@ export async function getPostUploadUrls({
 
 export function uploadFile(
   file: File,
-  uploadUrl: string,
+  upload: UploadMedia["upload"],
   onProgress: (loaded: number) => void
 ) {
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
+    const formData = new FormData();
+
+    Object.entries(upload.fields).forEach(([name, value]) => {
+      formData.append(name, value);
+    });
+    formData.append("file", file);
 
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -96,9 +105,8 @@ export function uploadFile(
     request.addEventListener("error", () =>
       reject(new Error("Media upload failed."))
     );
-    request.open("PUT", uploadUrl);
-    request.setRequestHeader("content-type", file.type);
-    request.send(file);
+    request.open("POST", upload.url);
+    request.send(formData);
   });
 }
 

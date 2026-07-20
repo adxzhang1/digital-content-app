@@ -69,7 +69,7 @@ Authorization: Bearer <firebase_id_token>
 - `POST /me/onboarding`: completes account setup by creating the initial internal user and profile after Firebase signup.
 - `GET /me`: resolves the signed-in Firebase user to the internal user/profile.
 - `GET /profiles/{username}`: public profile metadata.
-- `POST /posts/upload-urls`: creates a post ID, media IDs, and S3 upload URLs.
+- `POST /posts/upload`: creates a post ID, media IDs, and presigned S3 uploads.
 - `POST /posts`: finalizes uploaded media and starts image processing.
 - `GET /posts/{postId}`: post processing status.
 - `GET /profiles/{username}/posts`: profile-grid posts endpoint.

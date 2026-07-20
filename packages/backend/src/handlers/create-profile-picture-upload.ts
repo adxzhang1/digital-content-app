@@ -2,9 +2,8 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2
 } from "aws-lambda";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import {
@@ -19,8 +18,9 @@ import { s3Client } from "../lib/s3.js";
 const mediaBucketName = requireEnv("MEDIA_BUCKET_NAME");
 const profilesTableName = requireEnv("PROFILES_TABLE_NAME");
 
-const uploadUrlSchema = z.object({
-  contentType: z.enum(["image/jpeg", "image/png", "image/webp"])
+const uploadSchema = z.object({
+  contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  sizeBytes: z.number().int().positive()
 });
 
 const extensionByContentType = {
@@ -57,17 +57,17 @@ export async function handler(
     });
   }
 
-  const parsedBody = uploadUrlSchema.safeParse(body);
+  const parsedBody = uploadSchema.safeParse(body);
 
   if (!parsedBody.success) {
     return json(400, {
       code: "INVALID_UPLOAD_REQUEST",
       message:
-        parsedBody.error.issues[0]?.message ?? "Invalid upload URL payload."
+        parsedBody.error.issues[0]?.message ?? "Invalid upload payload."
     });
   }
 
-  const { contentType } = parsedBody.data;
+  const { contentType, sizeBytes } = parsedBody.data;
   const imageId = `img_${uuidv7()}`;
   const originalKey = `profiles/original/${authenticatedUser.profileId}/${imageId}.${
     extensionByContentType[contentType]
@@ -125,20 +125,24 @@ export async function handler(
     throw error;
   }
 
-  const uploadUrl = await getSignedUrl(
+  const upload = await createPresignedPost(
     s3Client,
-    new PutObjectCommand({
+    {
       Bucket: mediaBucketName,
       Key: originalKey,
-      ContentType: contentType
-    }),
-    {
-      expiresIn: 900
+      Conditions: [
+        ["content-length-range", 1, sizeBytes],
+        ["eq", "$Content-Type", contentType]
+      ],
+      Fields: {
+        "Content-Type": contentType
+      },
+      Expires: 900
     }
   );
 
   return json(200, {
     profilePicture,
-    uploadUrl
+    upload
   });
 }
