@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,7 +13,10 @@ import {
   fetchProfilePosts,
   profilePostsQueryKey,
 } from "@/features/profile/profile-post-api";
-import { PostFeedViewer } from "@/features/post-feed/post-feed-viewer";
+import {
+  PostFeedViewer,
+  type PostFeedPost,
+} from "@/features/post-feed/post-feed-viewer";
 import styles from "./post-feed-page.module.css";
 import profileStyles from "../../page.module.css";
 import type { ProfilePostSummary } from "@/features/profile/profile-data";
@@ -38,6 +41,14 @@ export function PostFeedPage({
     queryFn: () => fetchProfilePosts(username),
   });
   const posts = postsQuery.data ?? [];
+  const feedPosts = useMemo<PostFeedPost[]>(
+    () =>
+      (postsQuery.data ?? []).map((post) => ({
+        ...post,
+        username,
+      })),
+    [postsQuery.data, username]
+  );
   const hasInitialPost = posts.some((post) => post.postId === initialPostId);
 
   const closeFeed = useCallback(() => {
@@ -57,8 +68,8 @@ export function PostFeedPage({
   );
 
   const handleActivePostChange = useCallback(
-    (postId: string) => {
-      const postPath = `/profiles/${encodeURIComponent(username)}/posts/${encodeURIComponent(postId)}`;
+    (post: PostFeedPost) => {
+      const postPath = `/profiles/${encodeURIComponent(post.username)}/posts/${encodeURIComponent(post.postId)}`;
 
       if (postPath === `${window.location.pathname}${window.location.search}`) {
         return;
@@ -66,7 +77,7 @@ export function PostFeedPage({
 
       window.history.replaceState(window.history.state, "", postPath);
     },
-    [username]
+    []
   );
 
   const handleAuthReady = useCallback(() => {
@@ -136,8 +147,7 @@ export function PostFeedPage({
         onActivePostChange={handleActivePostChange}
         onClose={closeFeed}
         onPostDeleted={removePost}
-        posts={posts}
-        username={username}
+        posts={feedPosts}
       />
     </>
   );

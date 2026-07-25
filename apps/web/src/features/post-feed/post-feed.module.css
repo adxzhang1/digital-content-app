@@ -1,15 +1,9 @@
-.modalBackdrop {
+.viewer {
   background: #000000;
   inset: 0;
+  overflow: hidden;
   position: fixed;
   z-index: 20;
-}
-
-.modal {
-  background: #000000;
-  height: 100dvh;
-  overflow: hidden;
-  width: 100%;
 }
 
 .feedShell {
@@ -23,7 +17,7 @@
   width: 100%;
 }
 
-.modalVisual {
+.mediaStage {
   height: 100dvh;
   overflow: hidden;
   position: relative;
@@ -178,9 +172,9 @@ video.mediaElement {
   object-fit: cover;
 }
 
-.modalLike,
-.modalLikeActive,
-.modalFit {
+.likeButton,
+.likeButtonActive,
+.fitButton {
   align-items: center;
   background: transparent;
   border: 0;
@@ -193,7 +187,7 @@ video.mediaElement {
   width: 42px;
 }
 
-.modalLikeActive {
+.likeButtonActive {
   color: var(--accent);
   cursor: default;
 }
@@ -210,7 +204,7 @@ video.mediaElement {
   width: 32px;
 }
 
-.modalClose {
+.closeButton {
   background: rgba(0, 0, 0, 0.48);
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 50%;
@@ -279,7 +273,7 @@ video.mediaElement {
   opacity: 0.55;
 }
 
-.modalContent {
+.postContent {
   bottom: 28px;
   color: #ffffff;
   display: grid;
@@ -291,24 +285,24 @@ video.mediaElement {
   z-index: 1;
 }
 
-.modalCaption {
+.caption {
   font-size: 1rem;
   line-height: 1.5;
   white-space: pre-wrap;
 }
 
-.modalDate {
+.postDate {
   color: rgba(255, 255, 255, 0.78);
   font-size: 0.85rem;
   font-weight: 800;
 }
 
-.modalError {
+.postError {
   color: #ffb4a8;
   font-weight: 700;
 }
 
-.modalActions {
+.postActions {
   align-items: center;
   color: #ffffff;
   display: grid;
@@ -322,25 +316,25 @@ video.mediaElement {
   z-index: 1;
 }
 
-.modalActions strong {
+.postActions strong {
   font-size: 0.9rem;
 }
 
 @media (max-width: 720px) {
-  .modalContent {
+  .postContent {
     bottom: 22px;
     left: 16px;
     max-width: calc(100% - 96px);
   }
 
-  .modalActions {
+  .postActions {
     right: 16px;
     top: 70%;
   }
 
-  .modalLike,
-  .modalLikeActive,
-  .modalFit {
+  .likeButton,
+  .likeButtonActive,
+  .fitButton {
     height: 38px;
     width: 38px;
   }

@@ -9,6 +9,7 @@ import {
   fetchPostDetail,
   likePost,
   postDetailQueryKey,
+  postDetailQueryRoot,
 } from "@/features/profile/profile-post-api";
 import { PostFeedItem, type DeleteMode } from "./post-feed-item";
 import {
@@ -23,14 +24,17 @@ import type {
 
 type PostFeedViewerProps = {
   initialPostId: string;
-  onActivePostChange: (postId: string) => void;
+  onActivePostChange: (post: PostFeedPost) => void;
   onClose: () => void;
   onPostDeleted: (postId: string) => void;
-  posts: ProfilePostSummary[];
+  posts: PostFeedPost[];
+};
+
+export type PostFeedPost = ProfilePostSummary & {
   username: string;
 };
 
-type FeedPost = ProfilePostSummary & {
+type FeedPost = PostFeedPost & {
   id: string;
 };
 
@@ -40,7 +44,6 @@ export function PostFeedViewer({
   onClose,
   onPostDeleted,
   posts,
-  username,
 }: PostFeedViewerProps) {
   const auth = useAuth();
   const queryClient = useQueryClient();
@@ -61,14 +64,14 @@ export function PostFeedViewer({
   const activePostDetailQuery = useQuery({
     enabled: Boolean(activePost && isAccountReady),
     queryKey: activePost
-      ? postDetailQueryKey(username, activePost.postId)
-      : ["post-detail", username],
+      ? postDetailQueryKey(activePost.username, activePost.postId)
+      : postDetailQueryRoot,
     queryFn: () => {
       if (!activePost) {
         throw new Error("Could not load post.");
       }
 
-      return fetchPostDetail(username, activePost.postId);
+      return fetchPostDetail(activePost.username, activePost.postId);
     },
   });
   const activePostDetail = activePostDetailQuery.data ?? null;
@@ -104,8 +107,14 @@ export function PostFeedViewer({
       ? activePostDetailQuery.error.message
       : null);
   const { mutate: mutateLikePost } = useMutation({
-    mutationFn: (postId: string) => likePost(username, postId),
-    onError: (_error, postId) => {
+    mutationFn: ({
+      postId,
+      username,
+    }: {
+      postId: string;
+      username: string;
+    }) => likePost(username, postId),
+    onError: (_error, { postId }) => {
       setLikedPostIds((currentIds) => {
         const nextIds = new Set(currentIds);
         nextIds.delete(postId);
@@ -117,11 +126,13 @@ export function PostFeedViewer({
     mutationFn: ({
       deleteMode,
       post,
+      username,
     }: {
       deleteMode?: DeleteMode;
       post: ProfilePostDetail;
+      username: string;
     }) => deletePost({ deleteMode, post, username }),
-    onSuccess: (_data, { post }) => {
+    onSuccess: (_data, { post, username }) => {
       setLikedPostIds((currentIds) => {
         const nextIds = new Set(currentIds);
         nextIds.delete(post.postId);
@@ -146,48 +157,59 @@ export function PostFeedViewer({
     (post: FeedPost) => {
       setActivePostId(post.postId);
       setDeleteError(null);
-      onActivePostChange(post.postId);
+      onActivePostChange(post);
     },
     [onActivePostChange]
   );
   const handleLikePost = useCallback(
-    async (postId: string) => {
-      if (likedPostIds.has(postId)) {
+    (post: PostFeedPost) => {
+      if (likedPostIds.has(post.postId)) {
         return;
       }
 
-      setLikedPostIds((currentIds) => new Set(currentIds).add(postId));
+      setLikedPostIds((currentIds) => new Set(currentIds).add(post.postId));
 
       if (!isAccountReady) {
         return;
       }
 
-      mutateLikePost(postId);
+      mutateLikePost({
+        postId: post.postId,
+        username: post.username,
+      });
     },
     [isAccountReady, likedPostIds, mutateLikePost]
   );
   const handleDeletePost = useCallback(
-    (post: ProfilePostDetail, deleteMode: DeleteMode = "soft") => {
-      if (!isAccountReady || auth.account?.profileId !== post.profileId) {
+    (
+      feedPost: PostFeedPost,
+      detailPost: ProfilePostDetail,
+      deleteMode: DeleteMode = "soft"
+    ) => {
+      if (!isAccountReady || auth.account?.profileId !== detailPost.profileId) {
         return;
       }
 
       setDeleteError(null);
-      mutateDeletePost({ deleteMode, post });
+      mutateDeletePost({
+        deleteMode,
+        post: detailPost,
+        username: feedPost.username,
+      });
     },
     [auth.account?.profileId, isAccountReady, mutateDeletePost]
   );
   const getCachedPostDetail = useCallback(
-    (postId: string) =>
+    (post: PostFeedPost) =>
       queryClient.getQueryData<ProfilePostDetail>(
-        postDetailQueryKey(username, postId)
+        postDetailQueryKey(post.username, post.postId)
       ),
-    [queryClient, username]
+    [queryClient]
   );
 
   const renderFeedPost = useCallback(
     (post: FeedPost, { isActive }: { isActive: boolean }) => {
-      const cachedPostDetail = getCachedPostDetail(post.postId);
+      const cachedPostDetail = getCachedPostDetail(post);
       const detailPost =
         post.postId === activePostId
           ? activePostDetail ?? cachedPostDetail
@@ -206,9 +228,11 @@ export function PostFeedViewer({
           isActive={isActive}
           isLiked={isLiked}
           likeCount={likeCount}
-          onDelete={(post, deleteMode) => void handleDeletePost(post, deleteMode)}
+          onDelete={(detailPost, deleteMode) =>
+            handleDeletePost(post, detailPost, deleteMode)
+          }
           onToggleImageFit={handleToggleImageFit}
-          onLike={(postId) => void handleLikePost(postId)}
+          onLike={() => handleLikePost(post)}
           post={post}
           postError={
             postError && post.postId === activePostId ? postError : null
@@ -233,34 +257,29 @@ export function PostFeedViewer({
   );
 
   return (
-    <main
-      aria-label="Feed"
-      className={styles.modalBackdrop}
-    >
-      <article className={styles.modal}>
-        <div className={styles.feedShell}>
-          <PostMediaVideoManager
-            activeVideo={activeVideo}
-            isImageCover={isImageCover}
-          >
-            <ScrollSnapFeed
-              activeItemId={activePostId}
-              ariaLabel="Post feed"
-              items={feedPosts}
-              onActiveItemChange={handleActivePostChange}
-              renderItem={renderFeedPost}
-            />
-          </PostMediaVideoManager>
-          <button
-            aria-label="Close post"
-            className={styles.modalClose}
-            onClick={onClose}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-      </article>
+    <main aria-label="Feed" className={styles.viewer}>
+      <div className={styles.feedShell}>
+        <PostMediaVideoManager
+          activeVideo={activeVideo}
+          isImageCover={isImageCover}
+        >
+          <ScrollSnapFeed
+            activeItemId={activePostId}
+            ariaLabel="Post feed"
+            items={feedPosts}
+            onActiveItemChange={handleActivePostChange}
+            renderItem={renderFeedPost}
+          />
+        </PostMediaVideoManager>
+        <button
+          aria-label="Close post"
+          className={styles.closeButton}
+          onClick={onClose}
+          type="button"
+        >
+          ×
+        </button>
+      </div>
     </main>
   );
 }

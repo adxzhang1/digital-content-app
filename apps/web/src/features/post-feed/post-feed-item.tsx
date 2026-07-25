@@ -17,7 +17,7 @@ export type PostFeedItemProps = {
   likeCount: number;
   onDelete: (post: ProfilePostDetail, deleteMode?: DeleteMode) => void;
   onToggleImageFit: () => void;
-  onLike: (postId: string) => void;
+  onLike: () => void;
   post: ProfilePostSummary;
   postError: string | null;
   resolvedPost: ProfilePostDetail | ProfilePostSummary;
@@ -49,14 +49,14 @@ function PostContent({
   resolvedPost: ProfilePostDetail | ProfilePostSummary;
 }) {
   return (
-    <div className={styles.modalContent}>
-      <time className={styles.modalDate} dateTime={post.createdAt}>
+    <div className={styles.postContent}>
+      <time className={styles.postDate} dateTime={post.createdAt}>
         {formatPostDate(post.createdAt)}
       </time>
       {resolvedPost.caption ? (
-        <p className={styles.modalCaption}>{resolvedPost.caption}</p>
+        <p className={styles.caption}>{resolvedPost.caption}</p>
       ) : null}
-      {postError ? <p className={styles.modalError}>{postError}</p> : null}
+      {postError ? <p className={styles.postError}>{postError}</p> : null}
     </div>
   );
 }
@@ -67,21 +67,19 @@ function PostActions({
   likeCount,
   onToggleImageFit,
   onLike,
-  postId,
 }: {
   isImageCover: boolean;
   isLiked: boolean;
   likeCount: number;
   onToggleImageFit: () => void;
-  onLike: (postId: string) => void;
-  postId: string;
+  onLike: () => void;
 }) {
   return (
-    <div className={styles.modalActions}>
+    <div className={styles.postActions}>
       <button
-        className={isLiked ? styles.modalLikeActive : styles.modalLike}
+        className={isLiked ? styles.likeButtonActive : styles.likeButton}
         disabled={isLiked}
-        onClick={() => onLike(postId)}
+        onClick={onLike}
         type="button"
       >
         <svg
@@ -103,7 +101,7 @@ function PostActions({
       <button
         aria-label={isImageCover ? "Contain image" : "Cover image"}
         aria-pressed={isImageCover}
-        className={styles.modalFit}
+        className={styles.fitButton}
         onClick={onToggleImageFit}
         type="button"
       >
@@ -193,7 +191,7 @@ export function PostFeedItem({
 
   return (
     <section className={styles.feedItem}>
-      <div className={styles.modalVisual}>
+      <div className={styles.mediaStage}>
         <PostMedia
           isActive={isActive}
           isImageCover={isImageCover}
@@ -212,7 +210,6 @@ export function PostFeedItem({
         likeCount={likeCount}
         onToggleImageFit={onToggleImageFit}
         onLike={onLike}
-        postId={post.postId}
       />
       {ownerPost ? (
         <PostOwnerMenu
