@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { PostMediaImageLayer } from "./post-media-image-layer";
-import { usePostMediaVideo, VideoHost } from "./post-media-video";
+import { usePostMediaVideo, VideoHost } from "./post-media-video-manager";
 import type {
   ProfilePostDetail,
   ProfilePostSummary,

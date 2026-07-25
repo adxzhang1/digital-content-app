@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import styles from "./post-feed-viewer.module.css";
+import styles from "./post-feed.module.css";
 import type { RefObject } from "react";
 
 export type VideoDimensions = {

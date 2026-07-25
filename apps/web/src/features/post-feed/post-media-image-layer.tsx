@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect } from "react";
 import { ScrollSnapCarousel } from "@/features/feed/scroll-snap-carousel";
-import styles from "./post-feed-viewer.module.css";
+import styles from "./post-feed.module.css";
 
 type PostMediaImageItem = {
   id: string;

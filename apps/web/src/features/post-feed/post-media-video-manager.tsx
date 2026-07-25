@@ -12,11 +12,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Hls from "hls.js";
-import styles from "./post-feed-viewer.module.css";
+import styles from "./post-feed.module.css";
 import {
   VideoControlButton,
   type VideoDimensions,
-} from "./post-media-video-control";
+} from "./post-media-video-controls";
 import type { ReactNode } from "react";
 
 export type ActiveVideo = {

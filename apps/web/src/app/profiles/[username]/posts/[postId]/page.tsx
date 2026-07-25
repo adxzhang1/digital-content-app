@@ -1,4 +1,4 @@
-import { PostFeedPage } from "../../post-feed-page";
+import { PostFeedPage } from "./post-feed-page";
 
 type PostFeedRouteProps = {
   params: Promise<{

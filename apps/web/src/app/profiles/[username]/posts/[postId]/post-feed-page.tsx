@@ -7,15 +7,15 @@ import {
   isAuthSessionLoading,
   isAuthSessionReady,
   useAuth,
-} from "../../auth-provider";
-import { AuthFlow } from "../../auth/auth-flow";
+} from "@/app/auth-provider";
+import { AuthFlow } from "@/app/auth/auth-flow";
 import {
   fetchProfilePosts,
   profilePostsQueryKey,
 } from "@/features/profile/profile-post-api";
-import { PostFeedViewer } from "./post-feed-viewer";
-import styles from "./post-feed-viewer.module.css";
-import profileStyles from "./page.module.css";
+import { PostFeedViewer } from "@/features/post-feed/post-feed-viewer";
+import styles from "./post-feed-page.module.css";
+import profileStyles from "../../page.module.css";
 import type { ProfilePostSummary } from "@/features/profile/profile-data";
 
 type PostFeedPageProps = {
@@ -77,7 +77,7 @@ export function PostFeedPage({
 
   if (isAccountPending || (isAccountReady && postsQuery.isPending)) {
     return (
-      <div className={styles.modalBackdrop}>
+      <div className={styles.pageBackdrop}>
         <div className={profileStyles.loadingPosts} role="status">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="9" />
@@ -112,7 +112,7 @@ export function PostFeedPage({
 
   if (postsQuery.isError || !hasInitialPost) {
     return (
-      <div className={styles.modalBackdrop}>
+      <div className={styles.pageBackdrop}>
         <div className={profileStyles.locked}>
           <button
             className={profileStyles.authLink}
@@ -130,7 +130,7 @@ export function PostFeedPage({
 
   return (
     <>
-      <div className={styles.feedPageScrollSurface} aria-hidden="true" />
+      <div className={styles.scrollSurface} aria-hidden="true" />
       <PostFeedViewer
         initialPostId={initialPostId}
         onActivePostChange={handleActivePostChange}

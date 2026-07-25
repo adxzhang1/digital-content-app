@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PostMedia } from "./post-media";
-import styles from "./post-feed-viewer.module.css";
+import styles from "./post-feed.module.css";
 import type {
   ProfilePostDetail,
   ProfilePostSummary,

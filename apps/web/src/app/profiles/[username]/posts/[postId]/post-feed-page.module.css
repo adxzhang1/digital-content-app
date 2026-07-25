@@ -1,0 +1,13 @@
+.pageBackdrop {
+  background: #000000;
+  inset: 0;
+  position: fixed;
+  z-index: 20;
+}
+
+/* Keeps the page scrollable behind the fixed feed so mobile browser UI can collapse. */
+.scrollSurface {
+  background: #000000;
+  min-height: calc(100dvh + 120px);
+  pointer-events: none;
+}
