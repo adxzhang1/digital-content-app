@@ -3,7 +3,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScrollSnapFeed } from "@/features/feed/scroll-snap-feed";
-import { isAuthSessionReady, useAuth } from "@/app/auth-provider";
+import {
+  isAuthSessionReady,
+  useAuth,
+} from "@/features/auth/auth-provider";
 import {
   deletePost,
   fetchPostDetail,

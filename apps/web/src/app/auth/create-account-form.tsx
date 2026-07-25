@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { FormEvent, useState } from "react";
-import { useAuth } from "../auth-provider";
+import { useAuth } from "@/features/auth/auth-provider";
 import { createFirebaseUser } from "@/lib/auth-client";
 import { completeOnboarding } from "@/features/auth/account-api";
 import styles from "./page.module.css";

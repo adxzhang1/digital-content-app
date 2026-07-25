@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AuthProvider } from "./auth-provider";
+import { AuthProvider } from "@/features/auth/auth-provider";
 import "./globals.css";
 import { QueryProvider } from "./query-provider";
 

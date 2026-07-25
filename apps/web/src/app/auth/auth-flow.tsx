@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAuthSessionError, useAuth } from "../auth-provider";
+import {
+  getAuthSessionError,
+  useAuth,
+} from "@/features/auth/auth-provider";
 import { signOutCurrentUser } from "@/lib/auth-client";
 import { CreateAccountForm } from "./create-account-form";
 import styles from "./page.module.css";

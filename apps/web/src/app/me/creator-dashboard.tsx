@@ -7,7 +7,7 @@ import {
   isAuthSessionLoading,
   isAuthSessionReady,
   useAuth,
-} from "../auth-provider";
+} from "@/features/auth/auth-provider";
 import { ProfilePostGrid } from "../profiles/[username]/profile-post-grid";
 import {
   getProfile,

@@ -7,7 +7,7 @@ import {
   isAuthSessionLoading,
   isAuthSessionReady,
   useAuth,
-} from "../../auth-provider";
+} from "@/features/auth/auth-provider";
 import { AuthFlow } from "../../auth/auth-flow";
 import styles from "./page.module.css";
 import {

@@ -7,7 +7,7 @@ import {
   isAuthSessionLoading,
   isAuthSessionReady,
   useAuth,
-} from "@/app/auth-provider";
+} from "@/features/auth/auth-provider";
 import { AuthFlow } from "@/app/auth/auth-flow";
 import {
   fetchProfilePosts,

@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { isAuthSessionReady, useAuth } from "./auth-provider";
+import {
+  isAuthSessionReady,
+  useAuth,
+} from "@/features/auth/auth-provider";
 import styles from "./top-nav.module.css";
 
 export function TopNav() {
