@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   isAuthSessionLoading,
   isAuthSessionReady,
@@ -13,7 +14,6 @@ import {
   fetchProfilePosts,
   profilePostsQueryKey,
 } from "@/features/profile/profile-post-api";
-import { PostFeedViewer } from "./post-feed-viewer";
 import type { ProfilePostSummary } from "@/features/profile/profile-data";
 
 type ProfilePostGridProps = {
@@ -21,25 +21,24 @@ type ProfilePostGridProps = {
 };
 
 function PostPreview({
+  href,
   post,
-  onOpen,
 }: {
+  href: string;
   post: ProfilePostSummary;
-  onOpen: () => void;
 }) {
   const imageUrl = post.thumbnail?.url;
 
   return (
-    <button
+    <Link
       aria-label="Open post"
       className={styles.post}
-      onClick={onOpen}
-      type="button"
+      href={href}
     >
       {imageUrl ? (
         <img alt="" className={styles.postImage} src={imageUrl} />
       ) : null}
-    </button>
+    </Link>
   );
 }
 
@@ -47,10 +46,8 @@ export function ProfilePostGrid({
   username,
 }: ProfilePostGridProps) {
   const auth = useAuth();
-  const queryClient = useQueryClient();
   const isAccountReady = isAuthSessionReady(auth.session);
   const isAccountPending = isAuthSessionLoading(auth.session);
-  const [viewerPostId, setViewerPostId] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const postsQuery = useQuery({
     enabled: isAccountReady,
@@ -58,26 +55,6 @@ export function ProfilePostGrid({
     queryFn: () => fetchProfilePosts(username),
   });
   const posts = postsQuery.data ?? [];
-
-  function openPost(post: ProfilePostSummary) {
-    setViewerPostId(post.postId);
-  }
-
-  function closeViewer() {
-    setViewerPostId(null);
-  }
-
-  function removePost(postId: string) {
-    queryClient.setQueryData<ProfilePostSummary[]>(
-      profilePostsQueryKey(username),
-      (currentPosts = []) =>
-        currentPosts.filter((currentPost) => currentPost.postId !== postId)
-    );
-
-    if (viewerPostId === postId) {
-      setViewerPostId(null);
-    }
-  }
 
   const handleAuthReady = useCallback(() => {
     setIsAuthModalOpen(false);
@@ -117,22 +94,12 @@ export function ProfilePostGrid({
         <div className={styles.grid}>
           {posts.map((post) => (
             <PostPreview
+              href={`/profiles/${encodeURIComponent(username)}/posts/${encodeURIComponent(post.postId)}`}
               key={post.postId}
-              onOpen={() => openPost(post)}
               post={post}
             />
           ))}
         </div>
-      ) : null}
-
-      {viewerPostId ? (
-        <PostFeedViewer
-          initialPostId={viewerPostId}
-          onClose={closeViewer}
-          onPostDeleted={removePost}
-          posts={posts}
-          username={username}
-        />
       ) : null}
 
       {isAuthModalOpen ? (

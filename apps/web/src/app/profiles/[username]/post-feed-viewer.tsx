@@ -23,6 +23,7 @@ import type {
 
 type PostFeedViewerProps = {
   initialPostId: string;
+  onActivePostChange: (postId: string) => void;
   onClose: () => void;
   onPostDeleted: (postId: string) => void;
   posts: ProfilePostSummary[];
@@ -35,6 +36,7 @@ type FeedPost = ProfilePostSummary & {
 
 export function PostFeedViewer({
   initialPostId,
+  onActivePostChange,
   onClose,
   onPostDeleted,
   posts,
@@ -128,8 +130,8 @@ export function PostFeedViewer({
       queryClient.removeQueries({
         queryKey: postDetailQueryKey(username, post.postId),
       });
+
       onPostDeleted(post.postId);
-      onClose();
     },
     onError: (error) => {
       setDeleteError(
@@ -144,8 +146,9 @@ export function PostFeedViewer({
     (post: FeedPost) => {
       setActivePostId(post.postId);
       setDeleteError(null);
+      onActivePostChange(post.postId);
     },
-    []
+    [onActivePostChange]
   );
   const handleLikePost = useCallback(
     async (postId: string) => {
@@ -230,11 +233,9 @@ export function PostFeedViewer({
   );
 
   return (
-    <div
+    <main
       aria-label="Feed"
-      aria-modal="true"
       className={styles.modalBackdrop}
-      role="dialog"
     >
       <article className={styles.modal}>
         <div className={styles.feedShell}>
@@ -260,6 +261,6 @@ export function PostFeedViewer({
           </button>
         </div>
       </article>
-    </div>
+    </main>
   );
 }

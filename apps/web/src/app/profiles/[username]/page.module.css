@@ -201,8 +201,7 @@
 .post {
   aspect-ratio: 4 / 5;
   background: var(--surface-muted);
-  border: 0;
-  cursor: pointer;
+  display: block;
   min-width: 0;
   overflow: hidden;
   position: relative;
