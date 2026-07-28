@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   isAuthSessionLoading,
@@ -117,6 +118,12 @@ export function CreatorDashboard() {
           <strong>{displayName}</strong>
           {bio ? <p>{bio}</p> : null}
           <div className={styles.profileActions}>
+            <Link
+              className={styles.profileActionLink}
+              href="/me/subscriptions"
+            >
+              Subscriptions
+            </Link>
             <button
               className={styles.editProfileButton}
               onClick={handleEditProfileOpen}

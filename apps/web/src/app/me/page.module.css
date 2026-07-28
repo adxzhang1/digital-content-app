@@ -136,14 +136,18 @@
   margin-top: 14px;
 }
 
-.editProfileButton {
+.editProfileButton,
+.profileActionLink {
+  align-items: center;
   background: var(--button-muted);
   border: 0;
   border-radius: 8px;
   color: var(--foreground);
   cursor: pointer;
+  display: inline-flex;
   font: inherit;
   font-weight: 800;
+  justify-content: center;
   min-height: 34px;
   padding: 0 12px;
 }

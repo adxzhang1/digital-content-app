@@ -20,6 +20,10 @@ import {
   postDetailQueryRoot,
   profilePostsQueryRoot,
 } from "@/features/profile/profile-post-api";
+import {
+  profileSubscriptionQueryRoot,
+  subscriptionsQueryKey,
+} from "@/features/subscriptions/subscription-api";
 
 export type AccountState = "unauthenticated" | "needs_onboarding" | "ready";
 
@@ -96,6 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryClient.removeQueries({ queryKey: ["account"] });
       queryClient.removeQueries({ queryKey: profilePostsQueryRoot });
       queryClient.removeQueries({ queryKey: postDetailQueryRoot });
+      queryClient.removeQueries({ queryKey: profileSubscriptionQueryRoot });
+      queryClient.removeQueries({ queryKey: subscriptionsQueryKey });
       setFirebaseUser(nextUser);
       setIsCheckingFirebase(false);
     });

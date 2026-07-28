@@ -3,6 +3,7 @@ import { TopNav } from "../../top-nav";
 import styles from "./page.module.css";
 import { ProfilePostGrid } from "./profile-post-grid";
 import { getProfile } from "@/features/profile/profile-api";
+import { ProfileSubscriptionButton } from "@/features/subscriptions/profile-subscription-button";
 
 type ProfilePageProps = {
   params: Promise<{
@@ -34,6 +35,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
           <div className={styles.profileMain}>
             <h1>{profile.username}</h1>
+
+            <ProfileSubscriptionButton profileId={profile.profileId} />
 
             <dl className={styles.counts} aria-label="Profile counts">
               <div>

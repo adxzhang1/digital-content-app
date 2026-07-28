@@ -7,6 +7,23 @@ export type ProfileRecord = Record<string, unknown> & {
   profileId: string;
 };
 
+export async function getProfileById(
+  profilesTableName: string,
+  profileId: string
+): Promise<ProfileRecord | undefined> {
+  const result = await documentClient.send(
+    new GetCommand({
+      TableName: profilesTableName,
+      Key: {
+        PK: `PROFILE#${profileId}`,
+        SK: "METADATA"
+      }
+    })
+  );
+
+  return result.Item as ProfileRecord | undefined;
+}
+
 export async function getProfileByUsername(
   profilesTableName: string,
   username: string
@@ -27,17 +44,7 @@ export async function getProfileByUsername(
     return undefined;
   }
 
-  const profileResult = await documentClient.send(
-    new GetCommand({
-      TableName: profilesTableName,
-      Key: {
-        PK: `PROFILE#${String(profileId)}`,
-        SK: "METADATA"
-      }
-    })
-  );
-
-  return profileResult.Item as ProfileRecord | undefined;
+  return getProfileById(profilesTableName, String(profileId));
 }
 
 const toProfilePictureResponse = async (
