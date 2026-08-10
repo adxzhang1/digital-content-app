@@ -6,6 +6,8 @@ export const defaultSignedUrlTtlSeconds = 60 * 30;
 export const getMediaSigningConfig = (): MediaSigningConfig => ({
   baseUrl: requireEnv("MEDIA_BASE_URL"),
   keyPairId: requireEnv("MEDIA_SIGNING_KEY_PAIR_ID"),
-  keySecretName: requireEnv("MEDIA_SIGNING_KEY_SECRET_NAME"),
+  privateKeyParameterName: requireEnv(
+    "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME"
+  ),
   expiresInSeconds: defaultSignedUrlTtlSeconds
 });

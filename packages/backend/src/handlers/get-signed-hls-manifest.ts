@@ -10,7 +10,9 @@ import { s3Client } from "../lib/s3.js";
 
 const mediaBucketName = requireEnv("MEDIA_BUCKET_NAME");
 const mediaSigningKeyPairId = requireEnv("MEDIA_SIGNING_KEY_PAIR_ID");
-const mediaSigningKeySecretName = requireEnv("MEDIA_SIGNING_KEY_SECRET_NAME");
+const mediaSigningPrivateKeyParameterName = requireEnv(
+  "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME"
+);
 const signedParamNames = ["Expires", "Key-Pair-Id", "Policy", "Signature"];
 
 const responseHeaders = {
@@ -63,7 +65,7 @@ const getMediaUrl = (baseUrl: string, key: string) =>
 const getSigningConfig = (mediaBaseUrl: string) => ({
   baseUrl: mediaBaseUrl,
   keyPairId: mediaSigningKeyPairId,
-  keySecretName: mediaSigningKeySecretName,
+  privateKeyParameterName: mediaSigningPrivateKeyParameterName,
   expiresInSeconds: defaultSignedUrlTtlSeconds
 });
 

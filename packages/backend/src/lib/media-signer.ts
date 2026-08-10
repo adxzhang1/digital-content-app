@@ -1,40 +1,28 @@
 import {
-  GetSecretValueCommand,
-  SecretsManagerClient
-} from "@aws-sdk/client-secrets-manager";
+  GetParameterCommand,
+  SSMClient
+} from "@aws-sdk/client-ssm";
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 
-const secretsManagerClient = new SecretsManagerClient({});
+const ssmClient = new SSMClient({});
 
 let privateKeyPromise: Promise<string> | undefined;
 
-const normalizePrivateKey = (secretValue: string) => {
-  try {
-    const parsed = JSON.parse(secretValue) as { privateKey?: unknown };
-
-    if (typeof parsed.privateKey === "string") {
-      return parsed.privateKey.replace(/\\n/g, "\n");
-    }
-  } catch {
-    return secretValue.replace(/\\n/g, "\n");
-  }
-
-  return secretValue.replace(/\\n/g, "\n");
-};
-
-const getPrivateKey = async (secretName: string) => {
+const getPrivateKey = async (parameterName: string) => {
   privateKeyPromise ??= (async () => {
-    const result = await secretsManagerClient.send(
-      new GetSecretValueCommand({
-        SecretId: secretName
+    const result = await ssmClient.send(
+      new GetParameterCommand({
+        Name: parameterName,
+        WithDecryption: true
       })
     );
+    const privateKey = result.Parameter?.Value;
 
-    if (!result.SecretString) {
-      throw new Error("Media signing private key secret is empty.");
+    if (!privateKey) {
+      throw new Error("Media signing private key parameter is empty.");
     }
 
-    return normalizePrivateKey(result.SecretString);
+    return privateKey.replace(/\\n/g, "\n");
   })();
 
   return privateKeyPromise;
@@ -43,7 +31,7 @@ const getPrivateKey = async (secretName: string) => {
 export type MediaSigningConfig = {
   baseUrl: string;
   keyPairId: string;
-  keySecretName: string;
+  privateKeyParameterName: string;
   expiresInSeconds: number;
 };
 
@@ -51,7 +39,7 @@ export const getSignedCloudFrontUrl = async (
   url: string,
   config: MediaSigningConfig
 ) => {
-  const privateKey = await getPrivateKey(config.keySecretName);
+  const privateKey = await getPrivateKey(config.privateKeyParameterName);
 
   return getSignedUrl({
     url,
@@ -70,7 +58,7 @@ export const getSignedCloudFrontUrlWithPolicy = async ({
   resourceUrl: string;
   url: string;
 }) => {
-  const privateKey = await getPrivateKey(config.keySecretName);
+  const privateKey = await getPrivateKey(config.privateKeyParameterName);
   const expiresAt = Math.floor(Date.now() / 1000) + config.expiresInSeconds;
   const policy = JSON.stringify({
     Statement: [

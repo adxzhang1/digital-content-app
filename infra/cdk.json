@@ -2,8 +2,9 @@
   "app": "pnpm exec tsx bin/app.ts",
   "context": {
     "firebaseProjectId": "digital-content-app-dev",
-    "firebaseServiceAccountSecretName": "digital-content/firebase-service-account/dev",
-    "mediaSigningKeySecretName": "digital-content/media-signing-key/dev"
+    "firebaseServiceAccountParameterName": "/digital-content/dev/firebase-service-account",
+    "mediaSigningPublicKeyParameterName": "/digital-content/dev/media-signing-public-key",
+    "mediaSigningPrivateKeyParameterName": "/digital-content/dev/media-signing-private-key"
   },
   "watch": {
     "include": ["**"],

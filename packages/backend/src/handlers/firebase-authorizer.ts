@@ -3,9 +3,9 @@ import type {
   APIGatewaySimpleAuthorizerWithContextResult
 } from "aws-lambda";
 import {
-  GetSecretValueCommand,
-  SecretsManagerClient
-} from "@aws-sdk/client-secrets-manager";
+  GetParameterCommand,
+  SSMClient
+} from "@aws-sdk/client-ssm";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -14,11 +14,11 @@ import { requireEnv } from "../lib/env.js";
 import type { AuthenticatedUser } from "../lib/auth.js";
 
 const firebaseProjectId = requireEnv("FIREBASE_PROJECT_ID");
-const firebaseServiceAccountSecretName = requireEnv(
-  "FIREBASE_SERVICE_ACCOUNT_SECRET_NAME"
+const firebaseServiceAccountParameterName = requireEnv(
+  "FIREBASE_SERVICE_ACCOUNT_PARAMETER_NAME"
 );
 const usersTableName = requireEnv("USERS_TABLE_NAME");
-const secretsManagerClient = new SecretsManagerClient({});
+const ssmClient = new SSMClient({});
 
 let firebaseAppPromise: Promise<void> | undefined;
 
@@ -28,18 +28,20 @@ const initializeFirebaseApp = async () => {
   }
 
   firebaseAppPromise ??= (async () => {
-    const secret = await secretsManagerClient.send(
-      new GetSecretValueCommand({
-        SecretId: firebaseServiceAccountSecretName
+    const result = await ssmClient.send(
+      new GetParameterCommand({
+        Name: firebaseServiceAccountParameterName,
+        WithDecryption: true
       })
     );
+    const serviceAccount = result.Parameter?.Value;
 
-    if (!secret.SecretString) {
-      throw new Error("Firebase service account secret is empty.");
+    if (!serviceAccount) {
+      throw new Error("Firebase service account parameter is empty.");
     }
 
     initializeApp({
-      credential: cert(JSON.parse(secret.SecretString) as object),
+      credential: cert(JSON.parse(serviceAccount) as object),
       projectId: firebaseProjectId
     });
   })();

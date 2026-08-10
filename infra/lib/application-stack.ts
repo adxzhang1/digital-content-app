@@ -53,7 +53,7 @@ import {
   HttpMethods,
   ObjectOwnership
 } from "aws-cdk-lib/aws-s3";
-import { Secret } from "aws-cdk-lib/aws-secretsmanager";
+import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Queue } from "aws-cdk-lib/aws-sqs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -63,33 +63,49 @@ export class ApplicationStack extends cdk.Stack {
     super(scope, id, props);
 
     const firebaseProjectId = this.node.tryGetContext("firebaseProjectId");
-    const firebaseServiceAccountSecretName = this.node.tryGetContext(
-      "firebaseServiceAccountSecretName"
+    const firebaseServiceAccountParameterName = this.node.tryGetContext(
+      "firebaseServiceAccountParameterName"
     );
-    const mediaSigningKeySecretName = this.node.tryGetContext(
-      "mediaSigningKeySecretName"
+    const mediaSigningPublicKeyParameterName = this.node.tryGetContext(
+      "mediaSigningPublicKeyParameterName"
+    );
+    const mediaSigningPrivateKeyParameterName = this.node.tryGetContext(
+      "mediaSigningPrivateKeyParameterName"
     );
 
     if (
       !firebaseProjectId ||
-      !firebaseServiceAccountSecretName ||
-      !mediaSigningKeySecretName
+      !firebaseServiceAccountParameterName ||
+      !mediaSigningPublicKeyParameterName ||
+      !mediaSigningPrivateKeyParameterName
     ) {
       throw new Error(
-        "Set firebaseProjectId, firebaseServiceAccountSecretName, and mediaSigningKeySecretName in CDK context."
+        "Set firebaseProjectId and the Firebase and media signing SSM parameter names in CDK context."
       );
     }
 
-    const firebaseServiceAccountSecret = Secret.fromSecretNameV2(
-      this,
-      "FirebaseServiceAccountSecret",
-      firebaseServiceAccountSecretName
-    );
-    const mediaSigningKeySecret = Secret.fromSecretNameV2(
-      this,
-      "MediaSigningKeySecret",
-      mediaSigningKeySecretName
-    );
+    const firebaseServiceAccountParameter =
+      StringParameter.fromSecureStringParameterAttributes(
+        this,
+        "FirebaseServiceAccountParameter",
+        {
+          parameterName: firebaseServiceAccountParameterName
+        }
+      );
+    const mediaSigningPublicKeyParameter =
+      StringParameter.fromStringParameterName(
+        this,
+        "MediaSigningPublicKeyParameter",
+        mediaSigningPublicKeyParameterName
+      );
+    const mediaSigningPrivateKeyParameter =
+      StringParameter.fromSecureStringParameterAttributes(
+        this,
+        "MediaSigningPrivateKeyParameter",
+        {
+          parameterName: mediaSigningPrivateKeyParameterName
+        }
+      );
 
     const createHandler = (id: string, entry: string) =>
       new NodejsFunction(this, id, {
@@ -196,9 +212,7 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     const mediaPublicKey = new PublicKey(this, "MediaPublicKey", {
-      encodedKey: mediaSigningKeySecret
-        .secretValueFromJson("publicKey")
-        .unsafeUnwrap()
+      encodedKey: mediaSigningPublicKeyParameter.stringValue
     });
     const mediaKeyGroup = new KeyGroup(this, "MediaKeyGroup", {
       items: [mediaPublicKey]
@@ -436,8 +450,8 @@ function handler(event) {
       usersTable.tableName
     );
     firebaseAuthorizerHandler.addEnvironment(
-      "FIREBASE_SERVICE_ACCOUNT_SECRET_NAME",
-      firebaseServiceAccountSecretName
+      "FIREBASE_SERVICE_ACCOUNT_PARAMETER_NAME",
+      firebaseServiceAccountParameterName
     );
     finalizePostHandler.addEnvironment(
       "POSTS_TABLE_NAME",
@@ -453,8 +467,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     finalizePostHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     completeProfilePictureUploadHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
@@ -486,8 +500,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     getProfilePostsHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     getPostDetailHandler.addEnvironment(
       "POSTS_TABLE_NAME",
@@ -503,8 +517,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     getPostDetailHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     getSignedHlsManifestHandler.addEnvironment(
       "MEDIA_BUCKET_NAME",
@@ -515,8 +529,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     getSignedHlsManifestHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     deletePostHandler.addEnvironment("POSTS_TABLE_NAME", postsTable.tableName);
     deletePostHandler.addEnvironment(
@@ -578,8 +592,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     updateCurrentProfileHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     getProfileHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
@@ -591,8 +605,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     getProfileHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     getProfileSubscriptionHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
@@ -624,8 +638,8 @@ function handler(event) {
       mediaPublicKey.publicKeyId
     );
     getSubscriptionsHandler.addEnvironment(
-      "MEDIA_SIGNING_KEY_SECRET_NAME",
-      mediaSigningKeySecretName
+      "MEDIA_SIGNING_PRIVATE_KEY_PARAMETER_NAME",
+      mediaSigningPrivateKeyParameterName
     );
     mediaBucket.grantPut(createPostUploadHandler);
     mediaBucket.grantPut(createProfilePictureUploadHandler);
@@ -634,14 +648,14 @@ function handler(event) {
     mediaBucket.grantDelete(deletePostHandler);
     mediaBucket.grantReadWrite(mediaConvertRole);
     usersTable.grantReadData(firebaseAuthorizerHandler);
-    firebaseServiceAccountSecret.grantRead(firebaseAuthorizerHandler);
-    mediaSigningKeySecret.grantRead(finalizePostHandler);
-    mediaSigningKeySecret.grantRead(updateCurrentProfileHandler);
-    mediaSigningKeySecret.grantRead(getProfileHandler);
-    mediaSigningKeySecret.grantRead(getSubscriptionsHandler);
-    mediaSigningKeySecret.grantRead(getProfilePostsHandler);
-    mediaSigningKeySecret.grantRead(getPostDetailHandler);
-    mediaSigningKeySecret.grantRead(getSignedHlsManifestHandler);
+    firebaseServiceAccountParameter.grantRead(firebaseAuthorizerHandler);
+    mediaSigningPrivateKeyParameter.grantRead(finalizePostHandler);
+    mediaSigningPrivateKeyParameter.grantRead(updateCurrentProfileHandler);
+    mediaSigningPrivateKeyParameter.grantRead(getProfileHandler);
+    mediaSigningPrivateKeyParameter.grantRead(getSubscriptionsHandler);
+    mediaSigningPrivateKeyParameter.grantRead(getProfilePostsHandler);
+    mediaSigningPrivateKeyParameter.grantRead(getPostDetailHandler);
+    mediaSigningPrivateKeyParameter.grantRead(getSignedHlsManifestHandler);
     mediaBucket.grantReadWrite(processPostMediaHandler);
     mediaBucket.grantReadWrite(processProfilePictureHandler);
     processPostMediaHandler.addToRolePolicy(
