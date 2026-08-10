@@ -13,7 +13,6 @@ import { documentClient } from "../lib/dynamodb.js";
 import { requireEnv } from "../lib/env.js";
 import type { AuthenticatedUser } from "../lib/auth.js";
 
-const firebaseProjectId = requireEnv("FIREBASE_PROJECT_ID");
 const firebaseServiceAccountParameterName = requireEnv(
   "FIREBASE_SERVICE_ACCOUNT_PARAMETER_NAME"
 );
@@ -41,8 +40,7 @@ const initializeFirebaseApp = async () => {
     }
 
     initializeApp({
-      credential: cert(JSON.parse(serviceAccount) as object),
-      projectId: firebaseProjectId
+      credential: cert(JSON.parse(serviceAccount) as object)
     });
   })();
 

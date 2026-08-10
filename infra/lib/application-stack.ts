@@ -62,7 +62,6 @@ export class ApplicationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const firebaseProjectId = this.node.tryGetContext("firebaseProjectId");
     const firebaseServiceAccountParameterName = this.node.tryGetContext(
       "firebaseServiceAccountParameterName"
     );
@@ -74,13 +73,12 @@ export class ApplicationStack extends cdk.Stack {
     );
 
     if (
-      !firebaseProjectId ||
       !firebaseServiceAccountParameterName ||
       !mediaSigningPublicKeyParameterName ||
       !mediaSigningPrivateKeyParameterName
     ) {
       throw new Error(
-        "Set firebaseProjectId and the Firebase and media signing SSM parameter names in CDK context."
+        "Set the Firebase and media signing SSM parameter names in CDK context."
       );
     }
 
@@ -440,10 +438,6 @@ function handler(event) {
     createProfilePictureUploadHandler.addEnvironment(
       "PROFILES_TABLE_NAME",
       profilesTable.tableName
-    );
-    firebaseAuthorizerHandler.addEnvironment(
-      "FIREBASE_PROJECT_ID",
-      firebaseProjectId
     );
     firebaseAuthorizerHandler.addEnvironment(
       "USERS_TABLE_NAME",

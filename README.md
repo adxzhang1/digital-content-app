@@ -59,11 +59,10 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
-The Firebase project ID and SSM parameter names are configured in `infra/cdk.json`:
+The backend SSM parameter names are configured in `infra/cdk.json`:
 
 ```json
 {
-  "firebaseProjectId": "digital-content-app-dev",
   "firebaseServiceAccountParameterName": "/digital-content/dev/firebase-service-account",
   "mediaSigningPublicKeyParameterName": "/digital-content/dev/media-signing-public-key",
   "mediaSigningPrivateKeyParameterName": "/digital-content/dev/media-signing-private-key"
