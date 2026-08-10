@@ -1,0 +1,26 @@
+.page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  padding: 0 20px 56px;
+}
+
+.content {
+  margin: 0 auto;
+  max-width: 680px;
+}
+
+.content h1 {
+  font-size: 1.5rem;
+  padding: 30px 4px 22px;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 0 0 40px;
+  }
+
+  .content {
+    padding: 0 16px;
+  }
+}

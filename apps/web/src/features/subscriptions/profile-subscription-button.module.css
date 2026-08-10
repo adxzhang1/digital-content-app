@@ -1,0 +1,38 @@
+.action {
+  align-items: start;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.subscribe,
+.subscribed {
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 36px;
+  padding: 0 16px;
+}
+
+.subscribe {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.subscribed {
+  background: var(--button-muted);
+  color: var(--foreground);
+}
+
+.subscribe:disabled,
+.subscribed:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.action p {
+  color: var(--danger);
+  font-size: 0.8rem;
+}

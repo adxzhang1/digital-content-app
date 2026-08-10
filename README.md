@@ -73,6 +73,10 @@ Authorization: Bearer <firebase_id_token>
 - `POST /posts`: finalizes uploaded media and starts image processing.
 - `GET /posts/{postId}`: post processing status.
 - `GET /profiles/{username}/posts`: profile-grid posts endpoint.
+- `GET /subscriptions/profile/{profileId}`: gets the current user's subscription status for a profile.
+- `PUT /subscriptions/profile/{profileId}`: subscribes the current user to a profile.
+- `DELETE /subscriptions/profile/{profileId}`: removes the current user's subscription to a profile.
+- `GET /me/subscriptions`: lists profiles the current user subscribes to.
 - `GET /profiles/{username}/posts/{postId}`: individual post details endpoint.
 - `DELETE /profiles/{username}/posts/{postId}`: creator-only soft delete. Send `deleteMode=force` to also delete the DynamoDB record and S3 media objects.
 - `POST /profiles/{username}/posts/{postId}/like`: like a post.

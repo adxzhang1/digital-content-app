@@ -153,6 +153,19 @@ export class ApplicationStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
+    const subscriptionsTable = new Table(this, "SubscriptionsTable", {
+      partitionKey: {
+        name: "PK",
+        type: AttributeType.STRING
+      },
+      sortKey: {
+        name: "SK",
+        type: AttributeType.STRING
+      },
+      billingMode: BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
+
     const mediaBucket = new Bucket(this, "MediaBucket", {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       cors: [
@@ -340,6 +353,18 @@ function handler(event) {
     const likePostHandler = createHandler(
       "LikePostHandler",
       "handlers/like-post.ts"
+    );
+    const getProfileSubscriptionHandler = createHandler(
+      "GetProfileSubscriptionHandler",
+      "handlers/get-profile-subscription.ts"
+    );
+    const updateProfileSubscriptionHandler = createHandler(
+      "UpdateProfileSubscriptionHandler",
+      "handlers/update-profile-subscription.ts"
+    );
+    const getSubscriptionsHandler = createHandler(
+      "GetSubscriptionsHandler",
+      "handlers/get-subscriptions.ts"
     );
     const processPostMediaHandler = new NodejsFunction(
       this,
@@ -569,6 +594,39 @@ function handler(event) {
       "MEDIA_SIGNING_KEY_SECRET_NAME",
       mediaSigningKeySecretName
     );
+    getProfileSubscriptionHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
+    );
+    getProfileSubscriptionHandler.addEnvironment(
+      "SUBSCRIPTIONS_TABLE_NAME",
+      subscriptionsTable.tableName
+    );
+    updateProfileSubscriptionHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
+    );
+    updateProfileSubscriptionHandler.addEnvironment(
+      "SUBSCRIPTIONS_TABLE_NAME",
+      subscriptionsTable.tableName
+    );
+    getSubscriptionsHandler.addEnvironment(
+      "PROFILES_TABLE_NAME",
+      profilesTable.tableName
+    );
+    getSubscriptionsHandler.addEnvironment(
+      "SUBSCRIPTIONS_TABLE_NAME",
+      subscriptionsTable.tableName
+    );
+    getSubscriptionsHandler.addEnvironment("MEDIA_BASE_URL", mediaBaseUrl);
+    getSubscriptionsHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_PAIR_ID",
+      mediaPublicKey.publicKeyId
+    );
+    getSubscriptionsHandler.addEnvironment(
+      "MEDIA_SIGNING_KEY_SECRET_NAME",
+      mediaSigningKeySecretName
+    );
     mediaBucket.grantPut(createPostUploadHandler);
     mediaBucket.grantPut(createProfilePictureUploadHandler);
     mediaBucket.grantRead(getSignedHlsManifestHandler);
@@ -580,6 +638,7 @@ function handler(event) {
     mediaSigningKeySecret.grantRead(finalizePostHandler);
     mediaSigningKeySecret.grantRead(updateCurrentProfileHandler);
     mediaSigningKeySecret.grantRead(getProfileHandler);
+    mediaSigningKeySecret.grantRead(getSubscriptionsHandler);
     mediaSigningKeySecret.grantRead(getProfilePostsHandler);
     mediaSigningKeySecret.grantRead(getPostDetailHandler);
     mediaSigningKeySecret.grantRead(getSignedHlsManifestHandler);
@@ -665,6 +724,12 @@ function handler(event) {
     profilesTable.grantReadData(getPostDetailHandler);
     profilesTable.grantReadData(deletePostHandler);
     profilesTable.grantReadData(likePostHandler);
+    profilesTable.grantReadData(getProfileSubscriptionHandler);
+    profilesTable.grantReadData(updateProfileSubscriptionHandler);
+    profilesTable.grantReadData(getSubscriptionsHandler);
+    subscriptionsTable.grantReadData(getProfileSubscriptionHandler);
+    subscriptionsTable.grantReadWriteData(updateProfileSubscriptionHandler);
+    subscriptionsTable.grantReadData(getSubscriptionsHandler);
 
     new Rule(this, "MediaConvertPostVideoCompletionRule", {
       eventPattern: {
@@ -847,6 +912,36 @@ function handler(event) {
       integration: new HttpLambdaIntegration(
         "LikePostIntegration",
         likePostHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/subscriptions/profile/{profileId}",
+      methods: [HttpMethod.GET],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "GetProfileSubscriptionIntegration",
+        getProfileSubscriptionHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/subscriptions/profile/{profileId}",
+      methods: [HttpMethod.PUT, HttpMethod.DELETE],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "UpdateProfileSubscriptionIntegration",
+        updateProfileSubscriptionHandler
+      )
+    });
+
+    api.addRoutes({
+      path: "/me/subscriptions",
+      methods: [HttpMethod.GET],
+      authorizer: firebaseAuthorizer,
+      integration: new HttpLambdaIntegration(
+        "GetSubscriptionsIntegration",
+        getSubscriptionsHandler
       )
     });
 

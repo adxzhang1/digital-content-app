@@ -83,3 +83,24 @@ Post:
 `PK` and `SK` are used for direct post access by immutable `postId`.
 
 `GSI1PK` and `GSI1SK` are only populated when a post reaches `READY`. They are removed on soft delete. Querying `GSI1PK = PROFILE#<profileId>` returns visible posts for a profile in created-at order.
+
+### `SubscriptionsTable`
+
+Stores subscriptions from private user accounts to public profiles.
+
+Keys:
+
+```txt
+PK
+SK
+```
+
+Entities:
+
+```txt
+Subscription:
+  PK = USER#<userId>
+  SK = SUBSCRIPTION#<profileId>
+```
+
+`PK` lists subscriptions for an immutable `userId`. `SK` identifies the subscribed profile by its immutable `profileId`.
