@@ -9,8 +9,8 @@ TypeScript monorepo with:
 ## Getting Started
 
 ```sh
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 The frontend runs on `http://localhost:3000`.
@@ -22,7 +22,7 @@ Use `/auth` to sign in or create the Firebase-backed application account.
 Run the backend typecheck:
 
 ```sh
-pnpm --filter @digital-content/backend typecheck
+npm run typecheck --workspace=@digital-content/backend
 ```
 
 ## Deploy
@@ -30,7 +30,7 @@ pnpm --filter @digital-content/backend typecheck
 Configure AWS credentials, then bootstrap and deploy:
 
 ```sh
-pnpm cdk -- bootstrap
+npm run cdk -- bootstrap
 aws ssm put-parameter \
   --name /digital-content/dev/firebase-service-account \
   --type SecureString \
@@ -46,7 +46,7 @@ aws ssm put-parameter \
   --type SecureString \
   --value "$(cat /absolute/path/to/media-private-key-dev.pem)" \
   --overwrite
-pnpm deploy
+npm run deploy
 ```
 
 The CDK stack outputs an `ApiUrl`. Set it in `apps/web/.env.local`:

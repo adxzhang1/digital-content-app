@@ -394,12 +394,7 @@ function handler(event) {
           forceDockerBundling: true,
           minify: true,
           sourceMap: true,
-          nodeModules: ["sharp"],
-          environment: {
-            // CDK's pnpm Docker bundling otherwise puts nondeterministic store
-            // metadata in the Lambda asset.
-            NPM_CONFIG_STORE_DIR: "/tmp/pnpm-cache"
-          }
+          nodeModules: ["sharp"]
         }
       }
     );
@@ -419,10 +414,7 @@ function handler(event) {
           forceDockerBundling: true,
           minify: true,
           sourceMap: true,
-          nodeModules: ["sharp"],
-          environment: {
-            NPM_CONFIG_STORE_DIR: "/tmp/pnpm-cache"
-          }
+          nodeModules: ["sharp"]
         }
       }
     );
