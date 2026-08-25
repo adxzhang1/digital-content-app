@@ -59,15 +59,7 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
-The backend SSM parameter names are configured in `infra/cdk.json`:
-
-```json
-{
-  "firebaseServiceAccountParameterName": "/digital-content/dev/firebase-service-account",
-  "mediaSigningPublicKeyParameterName": "/digital-content/dev/media-signing-public-key",
-  "mediaSigningPrivateKeyParameterName": "/digital-content/dev/media-signing-private-key"
-}
-```
+The deployment stage is configured in `infra/bin/app.ts`. The stack derives backend SSM parameter names using the `/digital-content/<stage>/...` convention.
 
 The service account JSON and media private key should stay outside the repo. The deployed Lambdas read them from encrypted SSM parameters. The media public key is stored as a standard SSM string parameter for CloudFront configuration.
 

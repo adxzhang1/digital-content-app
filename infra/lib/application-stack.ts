@@ -58,29 +58,21 @@ import { Queue } from "aws-cdk-lib/aws-sqs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+export interface ApplicationStackProps extends cdk.StackProps {
+  stage: "dev" | "prod";
+}
+
 export class ApplicationStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: ApplicationStackProps) {
     super(scope, id, props);
 
-    const firebaseServiceAccountParameterName = this.node.tryGetContext(
-      "firebaseServiceAccountParameterName"
-    );
-    const mediaSigningPublicKeyParameterName = this.node.tryGetContext(
-      "mediaSigningPublicKeyParameterName"
-    );
-    const mediaSigningPrivateKeyParameterName = this.node.tryGetContext(
-      "mediaSigningPrivateKeyParameterName"
-    );
-
-    if (
-      !firebaseServiceAccountParameterName ||
-      !mediaSigningPublicKeyParameterName ||
-      !mediaSigningPrivateKeyParameterName
-    ) {
-      throw new Error(
-        "Set the Firebase and media signing SSM parameter names in CDK context."
-      );
-    }
+    const parameterPrefix = `/digital-content/${props.stage}`;
+    const firebaseServiceAccountParameterName =
+      `${parameterPrefix}/firebase-service-account`;
+    const mediaSigningPublicKeyParameterName =
+      `${parameterPrefix}/media-signing-public-key`;
+    const mediaSigningPrivateKeyParameterName =
+      `${parameterPrefix}/media-signing-private-key`;
 
     const firebaseServiceAccountParameter =
       StringParameter.fromSecureStringParameterAttributes(

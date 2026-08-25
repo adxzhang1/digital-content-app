@@ -1,10 +1,5 @@
 {
   "app": "npm exec -- tsx bin/app.ts",
-  "context": {
-    "firebaseServiceAccountParameterName": "/digital-content/dev/firebase-service-account",
-    "mediaSigningPublicKeyParameterName": "/digital-content/dev/media-signing-public-key",
-    "mediaSigningPrivateKeyParameterName": "/digital-content/dev/media-signing-private-key"
-  },
   "watch": {
     "include": ["**"],
     "exclude": [
