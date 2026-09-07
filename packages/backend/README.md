@@ -1,106 +1,55 @@
 # Backend
 
+AWS Lambda API handlers and media-processing workers. Infrastructure is defined in [`infra/lib/application-stack.ts`](../../infra/lib/application-stack.ts).
+
 ## DynamoDB Tables
+
+All tables use string keys `PK` (partition key) and `SK` (sort key). The names below are CDK construct IDs.
 
 ### `UsersTable`
 
-Stores private account identity and Firebase lookup records.
+Stores private account identity and Firebase lookups.
 
-Keys:
+| Record | PK | SK |
+| --- | --- | --- |
+| User | `USER#<userId>` | `METADATA` |
+| Firebase UID lookup | `FIREBASE_UID#<firebaseUid>` | `METADATA` |
 
-```txt
-PK
-SK
-```
-
-Entities:
-
-```txt
-User:
-  PK = USER#<userId>
-  SK = METADATA
-
-Firebase UID lookup:
-  PK = FIREBASE_UID#<firebaseUid>
-  SK = METADATA
-```
-
-`User` is used for direct internal user access by immutable `userId`.
-
-`Firebase UID lookup` is used by the Lambda authorizer to resolve a Firebase user to the internal app user/profile.
+The Lambda authorizer uses the Firebase UID lookup to resolve the internal `userId` and `profileId`.
 
 ### `ProfilesTable`
 
-Stores public profile identity and username lookup records.
+Stores profile metadata, username lookups, and profile-picture processing records.
 
-Keys:
+| Record | PK | SK |
+| --- | --- | --- |
+| Profile | `PROFILE#<profileId>` | `METADATA` |
+| Username lookup | `USERNAME#<username>` | `METADATA` |
+| Profile image | `PROFILE_IMAGE#<imageId>` | `METADATA` |
 
-```txt
-PK
-SK
-```
-
-Entities:
-
-```txt
-Profile:
-  PK = PROFILE#<profileId>
-  SK = METADATA
-
-Username lookup:
-  PK = USERNAME#<username>
-  SK = METADATA
-```
-
-`Profile` is used for direct profile access by immutable `profileId`.
-
-`Username lookup` is used to resolve the public route parameter `username` to the immutable `profileId`.
+Username lookups resolve public usernames to profile IDs. Profile-image records track upload and processing status; successful processing updates the profile's `imageId` and `image` metadata.
 
 ### `PostsTable`
 
-Stores post records. Direct post operations use the base table key. Profile post lists use `GSI1`.
+Stores post metadata, media entries, processing status, and like counts.
 
-Keys:
+| Record | PK | SK |
+| --- | --- | --- |
+| Post | `POST#<postId>` | `METADATA` |
 
-```txt
-PK
-SK
-GSI1PK
-GSI1SK
-```
+Profile post lists use the `GSI1` index:
 
-Entities:
+- `GSI1PK`: `PROFILE#<profileId>`
+- `GSI1SK`: `POST#<createdAt>#<postId>`
 
-```txt
-Post:
-  PK = POST#<postId>
-  SK = METADATA
-
-  GSI1PK = PROFILE#<profileId>
-  GSI1SK = POST#<createdAt>#<postId>
-```
-
-`PK` and `SK` are used for direct post access by immutable `postId`.
-
-`GSI1PK` and `GSI1SK` are only populated when a post reaches `READY`. They are removed on soft delete. Querying `GSI1PK = PROFILE#<profileId>` returns visible posts for a profile in created-at order.
+Index keys are added when a post reaches `READY` and removed on soft delete (`DELETED`). Profile post queries return newest posts first.
 
 ### `SubscriptionsTable`
 
-Stores subscriptions from private user accounts to public profiles.
+Stores subscriptions from users to profiles.
 
-Keys:
+| Record | PK | SK |
+| --- | --- | --- |
+| Subscription | `USER#<userId>` | `SUBSCRIPTION#<profileId>` |
 
-```txt
-PK
-SK
-```
-
-Entities:
-
-```txt
-Subscription:
-  PK = USER#<userId>
-  SK = SUBSCRIPTION#<profileId>
-```
-
-`PK` lists subscriptions for an immutable `userId`. `SK` identifies the subscribed profile by its immutable `profileId`.
+Query by `PK` to list a user's subscriptions. Subscribing sets the record's status to `ACTIVE`; unsubscribing deletes the record.
